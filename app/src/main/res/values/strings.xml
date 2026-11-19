@@ -1,0 +1,22 @@
+<resources>
+    <string name="app_name">قناة الأنصاري</string>
+    <string name="channel_full_name">قناة الأنصاري الفضائية</string>
+    <string name="nav_home">الرئيسية</string>
+    <string name="nav_videos">الفيديوهات</string>
+    <string name="nav_live">البث المباشر</string>
+    <string name="nav_more">المزيد</string>
+    <string name="live_title">البث المباشر</string>
+    <string name="live_subtitle">للقنوات الفضائية</string>
+    <string name="videos_title">الفيديوهات</string>
+    <string name="videos_subtitle">والبرامج</string>
+    <string name="coverage_title">التغطيات</string>
+    <string name="coverage_subtitle">الميدانية</string>
+    <string name="events_title">الفعاليات</string>
+    <string name="events_subtitle">والمناسبات</string>
+    <string name="news_title">الأخبار</string>
+    <string name="news_subtitle">والتقارير</string>
+    <string name="services_title">جميع خدمات</string>
+    <string name="services_subtitle">قناة الأنصاري</string>
+    <string name="social_title">مواقع التواصل</string>
+    <string name="social_subtitle">الرسمية</string>
+</resources>

@@ -1,0 +1,6 @@
+{
+  "name": "قناة الأنصاري – Al Ansari TV",
+  "description": "تطبيق قناة الأنصاري الفضائية للبث المباشر، الفيديوهات والبرامج، التغطيات الميدانية، الفعاليات والمناسبات، والأخبار والتقارير.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
