@@ -1,24 +1,39 @@
 package com.example.ui.viewmodel
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import android.util.Log
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.auth.GoogleAuthHelper
+import com.example.data.auth.GoogleAuthHelper.authStateFlow
 import com.example.data.local.ChannelConfigStore
 import com.example.data.model.ChannelEvent
 import com.example.data.model.ChannelServiceItem
 import com.example.data.model.ChannelSettings
+import com.example.data.model.CloudChannelConfig
+import com.example.data.model.CoverageBookingRequest
 import com.example.data.model.FieldCoverage
 import com.example.data.model.LiveChannelSource
 import com.example.data.model.NewsReport
 import com.example.data.model.ProgramScheduleItem
 import com.example.data.model.SocialLink
+import com.example.data.model.SocialPlatform
 import com.example.data.model.VideoProgram
+import com.example.data.remote.FirestoreChannelRepository
 import com.example.data.repository.ChannelRepository
+import com.google.firebase.Firebase
+import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.auth.auth
+import com.google.firebase.firestore.FirebaseFirestoreException
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -26,6 +41,7 @@ data class AlAnsariUiState(
     val settings: ChannelSettings = ChannelSettings(
         primaryLiveUrl = "",
         backupLiveUrl = ChannelConfigStore.OPEN_HLS_TEST_STREAM,
+        liveTitle = "قناة الأنصاري للإنتاج الفني – البث المباشر",
         cmsApiBaseUrl = "",
         lastSyncedTimestamp = "مرتبط بقناة يوتيوب @alansarie1",
         facebookUrl = ChannelConfigStore.DEFAULT_FACEBOOK,
@@ -37,6 +53,11 @@ data class AlAnsariUiState(
         youtubeChannelId = ChannelConfigStore.DEFAULT_YOUTUBE_CHANNEL_ID,
         youtubeHandle = ChannelConfigStore.DEFAULT_YOUTUBE_HANDLE,
     ),
+    val currentUser: FirebaseUser? = null,
+    val isChannelOwner: Boolean = false,
+    val myBookings: List<CoverageBookingRequest> = emptyList(),
+    val adminBookings: List<CoverageBookingRequest> = emptyList(),
+    val isSavingCloud: Boolean = false,
     val channelTitle: String = "قناة الأنصاري للإنتاج الفني",
     val channelLogoUrl: String? = null,
     val youtubeLiveVideoId: String? = null,
@@ -57,14 +78,24 @@ data class AlAnsariUiState(
     val isSyncingCms: Boolean = false,
 )
 
-class AlAnsariViewModel(application: Application) : AndroidViewModel(application) {
+@OptIn(ExperimentalCoroutinesApi::class)
+class AlAnsariViewModel(
+    private val repository: ChannelRepository,
+    private val firestoreRepository: FirestoreChannelRepository,
+) : ViewModel() {
 
-    private val configStore = ChannelConfigStore(application.applicationContext)
-    private val repository = ChannelRepository(configStore)
+    private companion object {
+        const val TAG = "AlAnsariVM"
+        const val STOP_TIMEOUT_MILLIS = 5_000L
+    }
+
+    private val configStore = repository.configStore
+    private val auth = Firebase.auth
 
     private val selectedSourceIdFlow = MutableStateFlow("official_primary")
     private val statusMessageFlow = MutableStateFlow<String?>(null)
     private val isSyncingFlow = MutableStateFlow(false)
+    private val isSavingCloudFlow = MutableStateFlow(false)
     private val isRefreshingYouTubeFlow = MutableStateFlow(false)
     private val channelLogoUrlFlow = MutableStateFlow<String?>(null)
     private val channelTitleFlow = MutableStateFlow("قناة الأنصاري للإنتاج الفني")
@@ -76,79 +107,187 @@ class AlAnsariViewModel(application: Application) : AndroidViewModel(application
     private val remoteEventsOverride = MutableStateFlow<List<ChannelEvent>?>(null)
     private val remoteCoveragesOverride = MutableStateFlow<List<FieldCoverage>?>(null)
 
+    private val authUserFlow = auth.authStateFlow()
+
+    private val cloudConfigFlow = firestoreRepository.observeLiveChannelConfig()
+        .catch { error ->
+            val firestoreError = generateSequence(error) { it.cause }
+                .filterIsInstance<FirebaseFirestoreException>()
+                .firstOrNull()
+            if (firestoreError == null && error is CancellationException) throw error
+            Log.w(TAG, "Error observing cloud channel config", firestoreError ?: error)
+            emit(null)
+        }
+
+    private val myBookingsFlow = authUserFlow.flatMapLatest { user ->
+        if (user == null) {
+            flowOf(emptyList())
+        } else {
+            firestoreRepository.observeMyBookings(user.uid)
+                .catch { error ->
+                    val firestoreError = generateSequence(error) { it.cause }
+                        .filterIsInstance<FirebaseFirestoreException>()
+                        .firstOrNull()
+                    if (firestoreError == null && error is CancellationException) throw error
+                    Log.w(TAG, "Error observing user bookings", firestoreError ?: error)
+                    emit(emptyList())
+                }
+        }
+    }
+
+    private val adminBookingsFlow = authUserFlow.flatMapLatest { user ->
+        if (!GoogleAuthHelper.isVerifiedChannelOwner(user)) {
+            flowOf(emptyList())
+        } else {
+            firestoreRepository.observeAllBookingsForOwner()
+                .catch { error ->
+                    val firestoreError = generateSequence(error) { it.cause }
+                        .filterIsInstance<FirebaseFirestoreException>()
+                        .firstOrNull()
+                    if (firestoreError == null && error is CancellationException) throw error
+                    Log.w(TAG, "Error observing admin bookings", firestoreError ?: error)
+                    emit(emptyList())
+                }
+        }
+    }
+
     private data class AuxiliaryState(
         val bookmarkedVideos: Set<String>,
         val bookmarkedNews: Set<String>,
-        val savedRequests: List<String>,
         val selectedSourceId: String,
         val statusMessage: String?,
         val isSyncing: Boolean,
+        val isSavingCloud: Boolean,
         val isRefreshingYouTube: Boolean,
         val logoUrl: String?,
         val channelTitle: String,
         val liveVideoId: String?,
         val ytVideos: List<VideoProgram>?,
-        val overrides: Map<String, String>,
+        val currentUser: FirebaseUser?,
+        val myBookings: List<CoverageBookingRequest>,
+        val adminBookings: List<CoverageBookingRequest>,
     )
 
     private val auxiliaryFlow = combine(
         repository.bookmarkedVideosFlow,
         repository.bookmarkedNewsFlow,
-        repository.savedRequestsFlow,
         selectedSourceIdFlow,
         statusMessageFlow,
         isSyncingFlow,
+        isSavingCloudFlow,
         isRefreshingYouTubeFlow,
         channelLogoUrlFlow,
         channelTitleFlow,
         youtubeLiveVideoIdFlow,
         youtubeVideosFlow,
-        repository.customVideoOverridesFlow(),
+        authUserFlow,
+        myBookingsFlow,
+        adminBookingsFlow,
     ) { values ->
         @Suppress("UNCHECKED_CAST")
         AuxiliaryState(
             bookmarkedVideos = values[0] as Set<String>,
             bookmarkedNews = values[1] as Set<String>,
-            savedRequests = values[2] as List<String>,
-            selectedSourceId = values[3] as String,
-            statusMessage = values[4] as String?,
-            isSyncing = values[5] as Boolean,
+            selectedSourceId = values[2] as String,
+            statusMessage = values[3] as String?,
+            isSyncing = values[4] as Boolean,
+            isSavingCloud = values[5] as Boolean,
             isRefreshingYouTube = values[6] as Boolean,
             logoUrl = values[7] as String?,
             channelTitle = values[8] as String,
             liveVideoId = values[9] as String?,
             ytVideos = values[10] as List<VideoProgram>?,
-            overrides = values[11] as Map<String, String>,
+            currentUser = values[11] as FirebaseUser?,
+            myBookings = values[12] as List<CoverageBookingRequest>,
+            adminBookings = values[13] as List<CoverageBookingRequest>,
         )
     }
 
     val uiState: StateFlow<AlAnsariUiState> = combine(
         repository.settingsFlow,
-        repository.liveSourcesFlow(),
-        repository.socialLinksFlow(),
+        cloudConfigFlow,
+        repository.savedRequestsFlow,
         auxiliaryFlow,
-    ) { settings, liveSources, socialLinks, aux ->
+    ) { localSettings, cloudConfig, savedRequests, aux ->
+        val effectiveSettings = if (cloudConfig != null) {
+            localSettings.copy(
+                primaryLiveUrl = cloudConfig.primaryLiveUrl,
+                backupLiveUrl = cloudConfig.backupLiveUrl.ifBlank { localSettings.backupLiveUrl },
+                liveTitle = cloudConfig.liveTitle.ifBlank { localSettings.liveTitle },
+                youtubeHandle = cloudConfig.youtubeHandle.ifBlank { localSettings.youtubeHandle },
+                youtubeChannelId = cloudConfig.youtubeChannelId.ifBlank { localSettings.youtubeChannelId },
+                facebookUrl = cloudConfig.facebookUrl.ifBlank { localSettings.facebookUrl },
+                telegramUrl = cloudConfig.telegramUrl.ifBlank { localSettings.telegramUrl },
+                tiktokUrl = cloudConfig.tiktokUrl.ifBlank { localSettings.tiktokUrl },
+                websiteUrl = cloudConfig.instagramUrl.ifBlank { localSettings.websiteUrl },
+                youtubeUrl = "https://www.youtube.com/${cloudConfig.youtubeHandle.ifBlank { localSettings.youtubeHandle }}",
+                satelliteFrequency = cloudConfig.satelliteFrequency.ifBlank { localSettings.satelliteFrequency },
+            )
+        } else {
+            localSettings
+        }
+
+        val liveSources = repository.buildLiveSources(effectiveSettings)
         val resolvedSelectedId = if (liveSources.any { it.id == aux.selectedSourceId }) {
             aux.selectedSourceId
         } else {
             liveSources.firstOrNull()?.id ?: "technical_preview"
         }
 
+        val effectiveSocialLinks = listOf(
+            SocialLink(
+                id = "yt",
+                platform = SocialPlatform.YOUTUBE,
+                title = "يوتيوب قناة الأنصاري",
+                handle = effectiveSettings.youtubeHandle,
+                url = effectiveSettings.youtubeUrl,
+                followersLabel = "أكثر من 180 ألف مشترك • البث والأرشيف",
+            ),
+            SocialLink(
+                id = "tg",
+                platform = SocialPlatform.TELEGRAM,
+                title = "تيليجرام البث والأخبار",
+                handle = "@SNG1080",
+                url = effectiveSettings.telegramUrl,
+                followersLabel = "تغطيات SNG1080 والإعلانات الفورية",
+            ),
+            SocialLink(
+                id = "fb",
+                platform = SocialPlatform.FACEBOOK,
+                title = "فيسبوك الرسمي",
+                handle = "al.ansar.live",
+                url = effectiveSettings.facebookUrl,
+                followersLabel = "البث المباشر والتغطيات اليومية",
+            ),
+            SocialLink(
+                id = "tt",
+                platform = SocialPlatform.TIKTOK,
+                title = "تيك توك",
+                handle = effectiveSettings.youtubeHandle,
+                url = effectiveSettings.tiktokUrl,
+                followersLabel = "مقاطع قصيرة ولقطات ميدانية",
+            ),
+            SocialLink(
+                id = "ig",
+                platform = SocialPlatform.INSTAGRAM,
+                title = "إنستغرام",
+                handle = effectiveSettings.youtubeHandle,
+                url = effectiveSettings.websiteUrl,
+                followersLabel = "أبرز الصور والفعاليات",
+            ),
+        )
+
         val baseVideos = remoteVideosOverride.value
             ?: aux.ytVideos?.takeIf { it.isNotEmpty() }
             ?: repository.defaultVideos
 
-        val finalVideos = baseVideos.map { video ->
-            val customUrl = aux.overrides[video.id]
-            if (!customUrl.isNullOrBlank()) {
-                video.copy(videoUrl = customUrl, isPreviewStream = false)
-            } else {
-                video
-            }
-        }
-
         AlAnsariUiState(
-            settings = settings,
+            settings = effectiveSettings,
+            currentUser = aux.currentUser,
+            isChannelOwner = GoogleAuthHelper.isVerifiedChannelOwner(aux.currentUser),
+            myBookings = aux.myBookings,
+            adminBookings = aux.adminBookings,
+            isSavingCloud = aux.isSavingCloud,
             channelTitle = aux.channelTitle,
             channelLogoUrl = aux.logoUrl,
             youtubeLiveVideoId = aux.liveVideoId,
@@ -156,21 +295,21 @@ class AlAnsariViewModel(application: Application) : AndroidViewModel(application
             liveSources = liveSources,
             selectedLiveSourceId = resolvedSelectedId,
             scheduleItems = repository.scheduleItems,
-            videos = finalVideos,
+            videos = baseVideos,
             fieldCoverages = remoteCoveragesOverride.value ?: repository.fieldCoverages,
             events = remoteEventsOverride.value ?: repository.events,
             newsReports = remoteNewsOverride.value ?: repository.newsReports,
-            socialLinks = socialLinks,
+            socialLinks = effectiveSocialLinks,
             services = repository.servicesList,
             bookmarkedVideoIds = aux.bookmarkedVideos,
             bookmarkedNewsIds = aux.bookmarkedNews,
-            savedRequests = aux.savedRequests,
+            savedRequests = savedRequests,
             statusMessage = aux.statusMessage,
             isSyncingCms = aux.isSyncing,
         )
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
+        started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
         initialValue = AlAnsariUiState(
             liveSources = repository.buildLiveSources(AlAnsariUiState().settings),
             scheduleItems = repository.scheduleItems,
@@ -217,52 +356,111 @@ class AlAnsariViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun saveYouTubeSource(handle: String, channelId: String) {
-        viewModelScope.launch {
-            configStore.updateYouTubeSource(handle, channelId)
-            refreshFromYouTube(showToast = true)
-        }
-    }
-
     fun selectLiveSource(sourceId: String) {
         selectedSourceIdFlow.value = sourceId
     }
 
-    fun saveLiveStreamUrls(primaryUrl: String, backupUrl: String) {
-        viewModelScope.launch {
-            configStore.updateLiveUrls(primaryUrl, backupUrl)
-            if (primaryUrl.isNotBlank()) {
-                selectedSourceIdFlow.value = "official_primary"
-            }
-            statusMessageFlow.value = "تم حفظ روابط البث المباشر بنجاح"
-        }
-    }
-
-    fun updateVideoStreamUrl(videoId: String, customUrl: String) {
-        viewModelScope.launch {
-            configStore.setCustomVideoUrl(videoId, customUrl)
-            statusMessageFlow.value = "تم تحديث رابط الفيديو بنجاح"
-        }
-    }
-
-    fun saveSocialAndSatellite(
-        facebook: String,
-        youtube: String,
-        tiktok: String,
-        telegram: String,
-        website: String,
-        frequency: String,
+    fun publishCloudChannelConfig(
+        primaryLiveUrl: String,
+        backupLiveUrl: String,
+        liveTitle: String,
+        youtubeHandle: String,
+        youtubeChannelId: String,
+        facebookUrl: String,
+        telegramUrl: String,
+        tiktokUrl: String,
+        instagramUrl: String,
+        satelliteFrequency: String,
     ) {
         viewModelScope.launch {
-            configStore.updateSocialAndSatellite(
-                facebook = facebook,
-                youtube = youtube,
-                tiktok = tiktok,
-                telegram = telegram,
-                website = website,
-                frequency = frequency,
+            isSavingCloudFlow.value = true
+            val config = CloudChannelConfig(
+                primaryLiveUrl = primaryLiveUrl,
+                backupLiveUrl = backupLiveUrl,
+                liveTitle = liveTitle,
+                youtubeHandle = youtubeHandle,
+                youtubeChannelId = youtubeChannelId,
+                facebookUrl = facebookUrl,
+                telegramUrl = telegramUrl,
+                tiktokUrl = tiktokUrl,
+                instagramUrl = instagramUrl,
+                satelliteFrequency = satelliteFrequency,
             )
-            statusMessageFlow.value = "تم تحديث روابط التواصل والتردد"
+            val result = firestoreRepository.publishChannelConfig(config)
+            isSavingCloudFlow.value = false
+            result.onSuccess {
+                configStore.updateLiveUrls(primaryLiveUrl, backupLiveUrl)
+                configStore.updateYouTubeSource(youtubeHandle, youtubeChannelId)
+                configStore.updateSocialAndSatellite(
+                    facebook = facebookUrl,
+                    youtube = "https://www.youtube.com/${youtubeHandle.trim()}",
+                    tiktok = tiktokUrl,
+                    telegram = telegramUrl,
+                    website = instagramUrl,
+                    frequency = satelliteFrequency,
+                )
+                if (primaryLiveUrl.isNotBlank()) {
+                    selectedSourceIdFlow.value = "official_primary"
+                } else {
+                    selectedSourceIdFlow.value = "technical_preview"
+                }
+                statusMessageFlow.value = "تم نشر رابط البث وإعدادات القناة لجميع المشاهدين"
+            }.onFailure { err ->
+                statusMessageFlow.value = err.localizedMessage ?: "تعذر حفظ الإعدادات السحابية"
+            }
+        }
+    }
+
+    fun submitCloudCoverageBooking(
+        senderName: String,
+        phone: String,
+        governorate: String,
+        serviceType: String,
+        eventDate: String,
+        topic: String,
+        details: String,
+        onSubmitted: () -> Unit = {},
+    ) {
+        viewModelScope.launch {
+            isSavingCloudFlow.value = true
+            val result = firestoreRepository.submitCoverageBooking(
+                senderName = senderName,
+                phone = phone,
+                governorate = governorate,
+                serviceType = serviceType,
+                eventDate = eventDate,
+                topic = topic,
+                details = details,
+            )
+            isSavingCloudFlow.value = false
+            result.onSuccess {
+                configStore.addCoverageRequest("${System.currentTimeMillis()} — $senderName ($governorate): $topic")
+                statusMessageFlow.value = "تم إرسال طلب حجز التغطية والبث المباشر بنجاح"
+                onSubmitted()
+            }.onFailure { err ->
+                statusMessageFlow.value = err.localizedMessage ?: "تعذر إرسال الطلب، تأكد من الحقول والاتصال"
+            }
+        }
+    }
+
+    fun updateBookingStatus(
+        requestId: String,
+        newStatus: String,
+        adminNote: String? = null,
+    ) {
+        viewModelScope.launch {
+            isSavingCloudFlow.value = true
+            val result = firestoreRepository.updateBookingStatus(
+                requestId = requestId,
+                newStatus = newStatus,
+                adminNote = adminNote,
+            )
+            isSavingCloudFlow.value = false
+            result.onSuccess {
+                statusMessageFlow.value = "تم تحديث حالة طلب الحجز بنجاح"
+            }.onFailure { err ->
+                statusMessageFlow.value = err.localizedMessage ?: "تعذر تحديث حالة الطلب"
+            }
         }
     }
 
@@ -299,25 +497,8 @@ class AlAnsariViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun submitCoverageRequest(name: String, governorate: String, topic: String, details: String) {
-        viewModelScope.launch {
-            val formatted = "${System.currentTimeMillis()} — $name ($governorate): $topic"
-            configStore.addCoverageRequest(formatted)
-            statusMessageFlow.value = "تم تسجيل طلب التغطية الميدانية بنجاح"
-        }
-    }
-
-    fun resetAllSources() {
-        viewModelScope.launch {
-            configStore.resetAllDefaults()
-            remoteVideosOverride.value = null
-            remoteNewsOverride.value = null
-            remoteEventsOverride.value = null
-            remoteCoveragesOverride.value = null
-            selectedSourceIdFlow.value = "technical_preview"
-            refreshFromYouTube(showToast = false)
-            statusMessageFlow.value = "تمت استعادة الإعدادات الافتراضية"
-        }
+    fun showStatusMessage(message: String) {
+        statusMessageFlow.value = message
     }
 
     fun clearStatusMessage() {

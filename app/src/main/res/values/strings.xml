@@ -19,4 +19,6 @@
     <string name="services_subtitle">قناة الأنصاري</string>
     <string name="social_title">مواقع التواصل</string>
     <string name="social_subtitle">الرسمية</string>
+    <string name="booking_title">طلب حجز تغطية وبث مباشر</string>
+    <string name="booking_subtitle">احجز وحدة SNG1080 الآن</string>
 </resources>

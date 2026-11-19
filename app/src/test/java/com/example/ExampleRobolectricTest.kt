@@ -5,14 +5,22 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.local.ChannelConfigStore
 import com.example.data.model.ChannelSettings
+import com.example.data.model.StreamProtocol
+import com.example.data.model.VideoProgram
+import com.example.data.model.detectStreamProtocol
+import com.example.data.model.protocolBadgeLabel
 import com.example.data.repository.ChannelRepository
 import com.example.ui.components.AlAnsariBottomBar
 import com.example.ui.navigation.AlAnsariRoutes
 import com.example.ui.screens.HomeScreen
+import com.example.ui.screens.VideoPlayerScreen
+import com.example.ui.screens.extractYouTubeVideoId
 import com.example.ui.theme.AlAnsariTheme
+import com.example.ui.viewmodel.AlAnsariUiState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -36,7 +44,7 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun `home screen renders all seven sections and routes on click`() {
+    fun `home screen renders all seven sections plus booking cta and routes on click`() {
         val navigatedRoutes = mutableListOf<String>()
 
         composeTestRule.setContent {
@@ -48,6 +56,7 @@ class ExampleRobolectricTest {
 
         val expectedTags = listOf(
             "home_card_live",
+            "home_card_booking",
             "home_card_coverage",
             "home_card_videos",
             "home_card_news",
@@ -57,6 +66,7 @@ class ExampleRobolectricTest {
         )
 
         expectedTags.forEach { tag ->
+            composeTestRule.onNodeWithTag(tag).performScrollTo()
             composeTestRule.onNodeWithTag(tag).assertIsDisplayed()
             composeTestRule.onNodeWithTag(tag).performClick()
         }
@@ -64,6 +74,7 @@ class ExampleRobolectricTest {
         assertEquals(
             listOf(
                 AlAnsariRoutes.LIVE,
+                AlAnsariRoutes.BOOKING_REQUEST,
                 AlAnsariRoutes.FIELD_COVERAGE,
                 AlAnsariRoutes.VIDEOS,
                 AlAnsariRoutes.NEWS,
@@ -98,11 +109,56 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun `repository prioritizes configured official live stream url`() {
+    fun `stream protocol detector classifies hls rtmp and srt accurately`() {
+        assertEquals(StreamProtocol.SRT, detectStreamProtocol("srt://live.alansari.iq:9000?streamid=live"))
+        assertEquals(StreamProtocol.RTMP, detectStreamProtocol("rtmp://live.alansari.iq/app/stream"))
+        assertEquals(StreamProtocol.RTMP, detectStreamProtocol("rtmps://live.alansari.iq/app/stream"))
+        assertEquals(StreamProtocol.HLS, detectStreamProtocol("https://cdn.example.com/alansari/live.m3u8"))
+        assertEquals("SRT مباشر", protocolBadgeLabel(StreamProtocol.SRT))
+        assertEquals("RTMP مباشر", protocolBadgeLabel(StreamProtocol.RTMP))
+    }
+
+    @Test
+    fun `youtube video id extractor parses watch short embed and shorts urls`() {
+        assertEquals("dQw4w9WgXcQ", extractYouTubeVideoId("https://www.youtube.com/watch?v=dQw4w9WgXcQ"))
+        assertEquals("dQw4w9WgXcQ", extractYouTubeVideoId("https://youtu.be/dQw4w9WgXcQ?si=abc"))
+        assertEquals("dQw4w9WgXcQ", extractYouTubeVideoId("https://www.youtube.com/live/dQw4w9WgXcQ"))
+    }
+
+    @Test
+    fun `video player screen renders in-app youtube player for youtube channel videos`() {
+        val sampleVideo = VideoProgram(
+            id = "yt_abc12345678",
+            title = "مباشر المحاضرة الدينية",
+            category = "مجالس ومحاضرات",
+            duration = "يوتيوب",
+            publishedAt = "2026-11-19",
+            description = "بث مباشر",
+            videoUrl = "",
+            youtubeVideoId = "abc12345678",
+            youtubeWatchUrl = "https://www.youtube.com/watch?v=abc12345678",
+        )
+        composeTestRule.setContent {
+            AlAnsariTheme {
+                VideoPlayerScreen(
+                    videoId = sampleVideo.id,
+                    uiState = AlAnsariUiState(videos = listOf(sampleVideo)),
+                    onSelectVideo = {},
+                    onToggleBookmark = {},
+                    onBackClick = {},
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("youtube_inapp_player").assertIsDisplayed()
+    }
+
+    @Test
+    fun `repository prioritizes configured rtmp or srt live stream url`() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val repo = ChannelRepository(ChannelConfigStore(context))
         val settings = ChannelSettings(
-            primaryLiveUrl = "https://cdn.example.com/alansari/live.m3u8",
+            primaryLiveUrl = "srt://live.alansari.iq:9000?mode=caller",
             backupLiveUrl = ChannelConfigStore.OPEN_HLS_TEST_STREAM,
             cmsApiBaseUrl = "",
             lastSyncedTimestamp = "",
@@ -118,7 +174,8 @@ class ExampleRobolectricTest {
         val sources = repo.buildLiveSources(settings)
         assertEquals(2, sources.size)
         assertTrue(sources.first().isConfiguredOfficial)
-        assertEquals("https://cdn.example.com/alansari/live.m3u8", sources.first().streamUrl)
+        assertEquals("srt://live.alansari.iq:9000?mode=caller", sources.first().streamUrl)
+        assertEquals("SRT مباشر", sources.first().qualityLabel)
         assertEquals("@alansarie1", ChannelConfigStore.DEFAULT_YOUTUBE_HANDLE)
         assertEquals("UCbZnqtO8B64mMhTzTXIxqUA", ChannelConfigStore.DEFAULT_YOUTUBE_CHANNEL_ID)
     }

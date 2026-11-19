@@ -1,0 +1,158 @@
+{
+  "entities": {
+    "ChannelConfig": {
+      "title": "ChannelConfig",
+      "description": "Publicly readable live broadcast configuration and official social links managed exclusively by the channel owner.",
+      "type": "object",
+      "properties": {
+        "primaryLiveUrl": {
+          "type": "string",
+          "description": "Primary live broadcast stream URL (HLS .m3u8, RTMP, or SRT)"
+        },
+        "backupLiveUrl": {
+          "type": "string",
+          "description": "Fallback broadcast stream URL"
+        },
+        "liveTitle": {
+          "type": "string",
+          "description": "Current live broadcast title shown to viewers"
+        },
+        "youtubeHandle": {
+          "type": "string",
+          "description": "Official YouTube handle (e.g. @alansarie1)"
+        },
+        "youtubeChannelId": {
+          "type": "string",
+          "description": "Official YouTube Channel ID"
+        },
+        "facebookUrl": {
+          "type": "string",
+          "description": "Official Facebook page URL"
+        },
+        "telegramUrl": {
+          "type": "string",
+          "description": "Official Telegram channel URL"
+        },
+        "tiktokUrl": {
+          "type": "string",
+          "description": "Official TikTok profile URL"
+        },
+        "instagramUrl": {
+          "type": "string",
+          "description": "Official Instagram profile URL"
+        },
+        "satelliteFrequency": {
+          "type": "string",
+          "description": "Broadcast frequency / SNG unit label"
+        },
+        "updatedByUid": {
+          "type": "string",
+          "description": "UID of the verified channel owner who updated the config"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the last update (FieldValue.serverTimestamp())"
+        }
+      },
+      "required": [
+        "primaryLiveUrl",
+        "backupLiveUrl",
+        "liveTitle",
+        "youtubeHandle",
+        "youtubeChannelId",
+        "facebookUrl",
+        "telegramUrl",
+        "tiktokUrl",
+        "instagramUrl",
+        "satelliteFrequency",
+        "updatedByUid",
+        "updatedAt"
+      ]
+    },
+    "CoverageRequest": {
+      "title": "CoverageRequest",
+      "description": "Viewer booking request for field coverage and live broadcast.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the authenticated user who submitted the booking"
+        },
+        "senderName": {
+          "type": "string",
+          "description": "Full name or organization / procession name"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Contact phone or WhatsApp number"
+        },
+        "governorate": {
+          "type": "string",
+          "description": "Governorate and district"
+        },
+        "serviceType": {
+          "type": "string",
+          "description": "Requested coverage type (coverage+live, live only, or recording)"
+        },
+        "eventDate": {
+          "type": "string",
+          "description": "Scheduled date and time of the event"
+        },
+        "topic": {
+          "type": "string",
+          "description": "Event title or occasion"
+        },
+        "details": {
+          "type": "string",
+          "description": "Optional address or extra details"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "confirmed", "completed", "declined"],
+          "description": "Booking review status"
+        },
+        "adminNote": {
+          "type": "string",
+          "description": "Optional status note written by the channel owner"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when created (FieldValue.serverTimestamp())"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last status update (FieldValue.serverTimestamp())"
+        }
+      },
+      "required": [
+        "userId",
+        "senderName",
+        "phone",
+        "governorate",
+        "serviceType",
+        "eventDate",
+        "topic",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/channel_config/{configId}": {
+      "schema": {
+        "$ref": "#/entities/ChannelConfig"
+      },
+      "description": "Single public broadcast config doc ('live'), writable strictly by the verified channel owner."
+    },
+    "/coverage_requests/{requestId}": {
+      "schema": {
+        "$ref": "#/entities/CoverageRequest"
+      },
+      "description": "Coverage and live broadcast booking requests isolated per requester and manageable by the verified channel owner."
+    }
+  }
+}

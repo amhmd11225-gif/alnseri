@@ -20,10 +20,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.credentials.CredentialManager
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -31,8 +35,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.data.auth.GoogleAuthHelper
+import com.example.data.local.ChannelConfigStore
+import com.example.data.remote.FirestoreChannelRepository
+import com.example.data.repository.ChannelRepository
 import com.example.ui.components.AlAnsariBottomBar
 import com.example.ui.navigation.AlAnsariRoutes
+import com.example.ui.screens.AdminPanelScreen
+import com.example.ui.screens.BookingCoverageScreen
 import com.example.ui.screens.EventsScreen
 import com.example.ui.screens.FieldCoverageScreen
 import com.example.ui.screens.HomeScreen
@@ -41,7 +51,6 @@ import com.example.ui.screens.MoreServicesScreen
 import com.example.ui.screens.NewsDetailScreen
 import com.example.ui.screens.NewsScreen
 import com.example.ui.screens.SocialLinksScreen
-import com.example.ui.screens.SourceSettingsScreen
 import com.example.ui.screens.VideoPlayerScreen
 import com.example.ui.screens.VideosScreen
 import com.example.ui.theme.AlAnsariTheme
@@ -49,6 +58,7 @@ import com.example.ui.theme.CardSurfaceTop
 import com.example.ui.theme.GoldBright
 import com.example.ui.theme.ObsidianBlack
 import com.example.ui.viewmodel.AlAnsariViewModel
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -66,9 +76,23 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun AlAnsariApp(
-    viewModel: AlAnsariViewModel = viewModel(),
-) {
+fun AlAnsariApp() {
+    val context = LocalContext.current
+    val appContext = context.applicationContext
+    val viewModel: AlAnsariViewModel = viewModel(
+        factory = viewModelFactory {
+            initializer {
+                val configStore = ChannelConfigStore(appContext)
+                val repo = ChannelRepository(configStore)
+                val firestoreDb = FirebaseFirestore.getInstance(
+                    appContext.getString(R.string.firestore_database_id),
+                )
+                val firestoreRepo = FirestoreChannelRepository(firestoreDb)
+                AlAnsariViewModel(repo, firestoreRepo)
+            }
+        },
+    )
+
     val navController = rememberNavController()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -76,6 +100,17 @@ fun AlAnsariApp(
 
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+    val credentialManager = remember(context) { CredentialManager.create(context) }
+
+    LaunchedEffect(Unit) {
+        GoogleAuthHelper.attemptAutoSignIn(
+            context = context,
+            credentialManager = credentialManager,
+            scope = coroutineScope,
+            onAuthSuccess = {},
+            onUnauthenticated = {},
+        )
+    }
 
     LaunchedEffect(uiState.statusMessage) {
         val msg = uiState.statusMessage
@@ -151,8 +186,16 @@ fun AlAnsariApp(
                     LiveStreamScreen(
                         uiState = uiState,
                         onSelectSource = viewModel::selectLiveSource,
-                        onSaveStreamUrls = viewModel::saveLiveStreamUrls,
                         onBackClick = { navigateTab(AlAnsariRoutes.HOME) },
+                    )
+                }
+
+                composable(AlAnsariRoutes.BOOKING_REQUEST) {
+                    BookingCoverageScreen(
+                        uiState = uiState,
+                        onSubmitBooking = viewModel::submitCloudCoverageBooking,
+                        onShowMessage = viewModel::showStatusMessage,
+                        onBackClick = { navController.popBackStack() },
                     )
                 }
 
@@ -182,7 +225,6 @@ fun AlAnsariApp(
                             }
                         },
                         onToggleBookmark = viewModel::toggleVideoBookmark,
-                        onUpdateVideoUrl = viewModel::updateVideoStreamUrl,
                         onBackClick = { navController.popBackStack() },
                     )
                 }
@@ -228,7 +270,6 @@ fun AlAnsariApp(
                 composable(AlAnsariRoutes.SOCIAL) {
                     SocialLinksScreen(
                         uiState = uiState,
-                        onOpenSettings = { navController.navigate(AlAnsariRoutes.SOURCE_SETTINGS) },
                         onShowMessage = { msg ->
                             coroutineScope.launch { snackbarHostState.showSnackbar(msg) }
                         },
@@ -245,7 +286,6 @@ fun AlAnsariApp(
                                 else -> navController.navigate(route)
                             }
                         },
-                        onSubmitCoverageRequest = viewModel::submitCoverageRequest,
                         onShowMessage = { msg ->
                             coroutineScope.launch { snackbarHostState.showSnackbar(msg) }
                         },
@@ -253,14 +293,14 @@ fun AlAnsariApp(
                     )
                 }
 
-                composable(AlAnsariRoutes.SOURCE_SETTINGS) {
-                    SourceSettingsScreen(
+                composable(AlAnsariRoutes.ADMIN_PANEL) {
+                    AdminPanelScreen(
                         uiState = uiState,
-                        onSaveLiveUrls = viewModel::saveLiveStreamUrls,
-                        onSaveYouTubeSource = viewModel::saveYouTubeSource,
-                        onSaveSocialAndSatellite = viewModel::saveSocialAndSatellite,
+                        onPublishCloudConfig = viewModel::publishCloudChannelConfig,
+                        onUpdateBookingStatus = viewModel::updateBookingStatus,
+                        onRefreshYouTube = { viewModel.refreshFromYouTube(showToast = true) },
                         onSyncCms = viewModel::syncFromCmsDashboard,
-                        onResetDefaults = viewModel::resetAllSources,
+                        onShowMessage = viewModel::showStatusMessage,
                         onBackClick = { navController.popBackStack() },
                     )
                 }

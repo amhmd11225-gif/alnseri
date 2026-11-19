@@ -20,6 +20,9 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -84,14 +87,14 @@ fun HomeScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(174.dp),
+                    .height(152.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(142.dp),
+                        .height(124.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     Box(
@@ -111,7 +114,7 @@ fun HomeScreen(
                             error = painterResource(id = R.drawable.logo_al_ansari),
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .size(126.dp)
+                                .size(114.dp)
                                 .clip(CircleShape)
                                 .border(
                                     width = 2.5.dp,
@@ -127,7 +130,7 @@ fun HomeScreen(
                             contentScale = ContentScale.Fit,
                             modifier = Modifier
                                 .fillMaxWidth(0.84f)
-                                .height(138.dp),
+                                .height(120.dp),
                         )
                     }
                 }
@@ -146,7 +149,7 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Section 1: Featured Full-Width Live Broadcast Card
+            // Featured Full-Width Live Broadcast Card
             AlAnsariGoldCard(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { onNavigate(AlAnsariRoutes.LIVE) },
@@ -166,14 +169,14 @@ fun HomeScreen(
                         Text(
                             text = stringResource(R.string.live_title),
                             style = MaterialTheme.typography.headlineMedium.copy(
-                                fontSize = 22.sp,
+                                fontSize = 21.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = PureWhite,
                             ),
                             maxLines = 1,
                             textAlign = TextAlign.Center,
                         )
-                        Spacer(modifier = Modifier.height(5.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                         CrimsonPillBadge(
                             text = stringResource(R.string.live_subtitle),
                             horizontalPadding = 16.dp,
@@ -181,11 +184,67 @@ fun HomeScreen(
                         )
                     }
                     Spacer(modifier = Modifier.width(12.dp))
-                    LiveBroadcastTvIcon(size = 56.dp)
+                    LiveBroadcastTvIcon(size = 52.dp)
                 }
             }
 
-            Spacer(modifier = Modifier.height(9.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Prominent Direct Booking CTA Card on the Home Screen
+            AlAnsariGoldCard(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { onNavigate(AlAnsariRoutes.BOOKING_REQUEST) },
+                testTag = "home_card_booking",
+                cornerRadius = 16.dp,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.booking_title),
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontSize = 17.5.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = GoldBright,
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        CrimsonPillBadge(
+                            text = stringResource(R.string.booking_subtitle),
+                            horizontalPadding = 14.dp,
+                            verticalPadding = 2.5.dp,
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(GoldBright.copy(alpha = 0.14f))
+                            .border(1.2.dp, GoldBright, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Campaign,
+                            contentDescription = stringResource(R.string.booking_title),
+                            tint = GoldBright,
+                            modifier = Modifier.size(28.dp),
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Row 1: Right = Field Coverage, Left = Videos & Programs
             Row(
@@ -210,7 +269,7 @@ fun HomeScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(9.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Row 2: Right = News & Reports, Left = Events & Occasions
             Row(
@@ -235,7 +294,7 @@ fun HomeScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(9.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Row 3: Right = Official Social Media, Left = All Channel Services
             Row(
@@ -250,7 +309,7 @@ fun HomeScreen(
                     modifier = Modifier.weight(1f),
                     icon = {
                         Box(
-                            modifier = Modifier.height(40.dp),
+                            modifier = Modifier.height(38.dp),
                             contentAlignment = Alignment.Center,
                         ) {
                             SocialBadgesRow()
@@ -267,7 +326,7 @@ fun HomeScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
         }
     }
 }
@@ -282,11 +341,11 @@ private fun HomeGridCard(
     icon: @Composable () -> Unit,
 ) {
     AlAnsariGoldCard(
-        modifier = modifier.height(116.dp),
+        modifier = modifier.height(108.dp),
         onClick = onClick,
         testTag = testTag,
         cornerRadius = 16.dp,
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 9.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -294,7 +353,7 @@ private fun HomeGridCard(
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Box(
-                modifier = Modifier.height(40.dp),
+                modifier = Modifier.height(38.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 icon()
@@ -302,7 +361,7 @@ private fun HomeGridCard(
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium.copy(
-                    fontSize = 15.5.sp,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = PureWhite,
                 ),

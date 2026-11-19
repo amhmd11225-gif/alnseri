@@ -21,21 +21,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LiveTv
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,7 +39,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -53,12 +46,10 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.components.AlAnsariGoldCard
 import com.example.ui.components.AlAnsariMediaPlayer
 import com.example.ui.components.AlAnsariSubTopBar
+import com.example.ui.components.AlAnsariYouTubePlayer
 import com.example.ui.components.CrimsonPillBadge
-import com.example.ui.theme.CardSurfaceTop
 import com.example.ui.theme.CrimsonRed
 import com.example.ui.theme.GoldBright
-import com.example.ui.theme.GoldDarkBorder
-import com.example.ui.theme.MutedGray
 import com.example.ui.theme.ObsidianBlack
 import com.example.ui.theme.PureWhite
 import com.example.ui.viewmodel.AlAnsariUiState
@@ -67,15 +58,13 @@ import com.example.ui.viewmodel.AlAnsariUiState
 fun LiveStreamScreen(
     uiState: AlAnsariUiState,
     onSelectSource: (String) -> Unit,
-    onSaveStreamUrls: (String, String) -> Unit,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val activeSource = uiState.liveSources.firstOrNull { it.id == uiState.selectedLiveSourceId }
         ?: uiState.liveSources.firstOrNull()
-
-    var showEditDialog by remember { mutableStateOf(false) }
+    var playYouTubeLiveInApp by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -87,20 +76,6 @@ fun LiveStreamScreen(
             title = "البث المباشر",
             badgeText = uiState.settings.youtubeHandle,
             onBackClick = onBackClick,
-            trailingAction = {
-                IconButton(
-                    onClick = { showEditDialog = true },
-                    modifier = Modifier
-                        .size(48.dp)
-                        .testTag("edit_live_url_button"),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Edit,
-                        contentDescription = "تعديل رابط البث",
-                        tint = GoldBright,
-                    )
-                }
-            },
         )
 
         LazyColumn(
@@ -112,16 +87,25 @@ fun LiveStreamScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                AlAnsariMediaPlayer(
-                    streamUrl = activeSource?.streamUrl.orEmpty(),
-                    title = activeSource?.title ?: "البث المباشر لقناة الأنصاري",
-                    isLiveStream = true,
-                )
+                if (playYouTubeLiveInApp && !uiState.youtubeLiveVideoId.isNullOrBlank()) {
+                    AlAnsariYouTubePlayer(
+                        videoId = uiState.youtubeLiveVideoId,
+                        fallbackWebUrl = "https://www.youtube.com/${uiState.settings.youtubeHandle}/live",
+                        title = "البث المباشر على يوتيوب (${uiState.settings.youtubeHandle})",
+                    )
+                } else {
+                    AlAnsariMediaPlayer(
+                        streamUrl = activeSource?.streamUrl.orEmpty(),
+                        title = activeSource?.title ?: uiState.settings.liveTitle,
+                        isLiveStream = true,
+                    )
+                }
             }
 
             // Direct YouTube Live card linked to @alansarie1/live
             item {
-                val liveYtUrl = if (!uiState.youtubeLiveVideoId.isNullOrBlank()) {
+                val hasActiveYtLive = !uiState.youtubeLiveVideoId.isNullOrBlank()
+                val liveYtUrl = if (hasActiveYtLive) {
                     "https://www.youtube.com/watch?v=${uiState.youtubeLiveVideoId}"
                 } else {
                     "https://www.youtube.com/${uiState.settings.youtubeHandle}/live"
@@ -138,13 +122,11 @@ fun LiveStreamScreen(
                                     modifier = Modifier
                                         .size(8.dp)
                                         .clip(CircleShape)
-                                        .background(
-                                            if (!uiState.youtubeLiveVideoId.isNullOrBlank()) CrimsonRed else GoldBright,
-                                        ),
+                                        .background(if (hasActiveYtLive) CrimsonRed else GoldBright),
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = if (!uiState.youtubeLiveVideoId.isNullOrBlank()) {
+                                    text = if (hasActiveYtLive) {
                                         "يوجد بث مباشر حالي على يوتيوب!"
                                     } else {
                                         "البث المباشر عبر يوتيوب (${uiState.settings.youtubeHandle})"
@@ -157,32 +139,44 @@ fun LiveStreamScreen(
                             }
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "لفتح البث الفوري للمجالس والمواكب على قناة ${uiState.settings.youtubeHandle}.",
+                                text = "للمشاهدة المباشرة للمجالس والمواكب على قناة ${uiState.settings.youtubeHandle}.",
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(
                             onClick = {
-                                runCatching {
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(liveYtUrl)))
+                                if (hasActiveYtLive) {
+                                    playYouTubeLiveInApp = !playYouTubeLiveInApp
+                                } else {
+                                    runCatching {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(liveYtUrl)))
+                                    }
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed, contentColor = PureWhite),
                             shape = RoundedCornerShape(50),
                         ) {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                                imageVector = Icons.Filled.PlayArrow,
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp),
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("يوتيوب مباشر", style = MaterialTheme.typography.labelLarge)
+                            Text(
+                                text = when {
+                                    hasActiveYtLive && playYouTubeLiveInApp -> "مشغل القناة"
+                                    hasActiveYtLive -> "تشغيل بالداخل"
+                                    else -> "يوتيوب مباشر"
+                                },
+                                style = MaterialTheme.typography.labelLarge,
+                            )
                         }
                     }
                 }
             }
 
+            // Clean Viewer-Only Active Broadcast Info Card
             item {
                 AlAnsariGoldCard(
                     contentPadding = PaddingValues(14.dp),
@@ -194,7 +188,7 @@ fun LiveStreamScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = activeSource?.title ?: "البث المباشر",
+                                text = activeSource?.title ?: uiState.settings.liveTitle,
                                 style = MaterialTheme.typography.titleMedium.copy(color = GoldBright),
                             )
                             Spacer(modifier = Modifier.height(4.dp))
@@ -202,42 +196,31 @@ fun LiveStreamScreen(
                                 text = activeSource?.subtitle.orEmpty(),
                                 style = MaterialTheme.typography.bodyMedium,
                             )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = "المصدر الحالي: ${activeSource?.streamUrl.orEmpty()}",
-                                style = MaterialTheme.typography.labelSmall.copy(color = MutedGray),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
                         }
                         Spacer(modifier = Modifier.width(8.dp))
-                        Button(
-                            onClick = { showEditDialog = true },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = CrimsonRed,
-                                contentColor = PureWhite,
-                            ),
-                            shape = RoundedCornerShape(50),
-                            modifier = Modifier.testTag("configure_stream_button"),
-                        ) {
-                            Text("تعيين الرابط", style = MaterialTheme.typography.labelLarge)
-                        }
+                        CrimsonPillBadge(
+                            text = activeSource?.qualityLabel ?: "بث مباشر",
+                            horizontalPadding = 12.dp,
+                        )
                     }
                 }
             }
 
             item {
                 Text(
-                    text = "مصادر البث المتاحة",
+                    text = "جودات ومصادر البث المتاحة",
                     style = MaterialTheme.typography.titleMedium.copy(color = GoldBright),
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
 
             items(uiState.liveSources, key = { it.id }) { source ->
-                val isSelected = source.id == activeSource?.id
+                val isSelected = !playYouTubeLiveInApp && source.id == activeSource?.id
                 AlAnsariGoldCard(
-                    onClick = { onSelectSource(source.id) },
+                    onClick = {
+                        playYouTubeLiveInApp = false
+                        onSelectSource(source.id)
+                    },
                     testTag = "live_source_${source.id}",
                     contentPadding = PaddingValues(14.dp),
                 ) {
@@ -347,92 +330,4 @@ fun LiveStreamScreen(
             }
         }
     }
-
-    if (showEditDialog) {
-        EditLiveStreamDialog(
-            initialPrimary = uiState.settings.primaryLiveUrl,
-            initialBackup = uiState.settings.backupLiveUrl,
-            onDismiss = { showEditDialog = false },
-            onSave = { primary, backup ->
-                onSaveStreamUrls(primary, backup)
-                showEditDialog = false
-            },
-        )
-    }
-}
-
-@Composable
-private fun EditLiveStreamDialog(
-    initialPrimary: String,
-    initialBackup: String,
-    onDismiss: () -> Unit,
-    onSave: (String, String) -> Unit,
-) {
-    var primaryInput by remember { mutableStateOf(initialPrimary) }
-    var backupInput by remember { mutableStateOf(initialBackup) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = CardSurfaceTop,
-        titleContentColor = GoldBright,
-        textContentColor = PureWhite,
-        title = {
-            Text(
-                text = "إعداد روابط البث المباشر (HLS)",
-                style = MaterialTheme.typography.titleMedium.copy(color = GoldBright),
-            )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = "أدخل رابط البث المباشر لقناة الأنصاري بصيغة .m3u8 ليتم حفظه وتشغيله فوراً في المشغل.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                OutlinedTextField(
-                    value = primaryInput,
-                    onValueChange = { primaryInput = it },
-                    label = { Text("رابط البث الرسمي الرئيسي (.m3u8)") },
-                    placeholder = { Text("https://example.com/alansari/live.m3u8") },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GoldBright,
-                        unfocusedBorderColor = GoldDarkBorder,
-                        focusedLabelColor = GoldBright,
-                        unfocusedLabelColor = MutedGray,
-                        focusedTextColor = PureWhite,
-                        unfocusedTextColor = PureWhite,
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = backupInput,
-                    onValueChange = { backupInput = it },
-                    label = { Text("الرابط الاحتياطي / الاختباري") },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GoldBright,
-                        unfocusedBorderColor = GoldDarkBorder,
-                        focusedLabelColor = GoldBright,
-                        unfocusedLabelColor = MutedGray,
-                        focusedTextColor = PureWhite,
-                        unfocusedTextColor = PureWhite,
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onSave(primaryInput, backupInput) },
-                colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed),
-            ) {
-                Text("حفظ وتشغيل", color = PureWhite)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("إلغاء", color = GoldBright)
-            }
-        },
-    )
 }

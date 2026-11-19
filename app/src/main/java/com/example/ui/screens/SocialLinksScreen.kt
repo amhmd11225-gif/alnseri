@@ -28,7 +28,6 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -65,7 +64,6 @@ import com.example.ui.viewmodel.AlAnsariUiState
 @Composable
 fun SocialLinksScreen(
     uiState: AlAnsariUiState,
-    onOpenSettings: () -> Unit,
     onShowMessage: (String) -> Unit,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -82,18 +80,6 @@ fun SocialLinksScreen(
             title = "مواقع التواصل الرسمية",
             badgeText = "المنصات المعتمدة",
             onBackClick = onBackClick,
-            trailingAction = {
-                IconButton(
-                    onClick = onOpenSettings,
-                    modifier = Modifier.size(48.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Settings,
-                        contentDescription = "تعديل الروابط",
-                        tint = GoldBright,
-                    )
-                }
-            },
         )
 
         LazyColumn(
@@ -118,7 +104,7 @@ fun SocialLinksScreen(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "جميع الحسابات الرسمية قابلة للتخصيص والتعديل من إعدادات المصادر.",
+                                text = "تابع جميع الحسابات والمنصات الرسمية المعتمدة لقناة الأنصاري الفضائية.",
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }

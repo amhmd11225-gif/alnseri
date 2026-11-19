@@ -13,31 +13,28 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.LiveTv
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.SatelliteAlt
 import androidx.compose.material.icons.filled.SettingsInputAntenna
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -56,9 +53,7 @@ import com.example.ui.components.AlAnsariSubTopBar
 import com.example.ui.components.CrimsonPillBadge
 import com.example.ui.navigation.AlAnsariRoutes
 import com.example.ui.theme.CardSurfaceTop
-import com.example.ui.theme.CrimsonRed
 import com.example.ui.theme.GoldBright
-import com.example.ui.theme.GoldDarkBorder
 import com.example.ui.theme.MutedGray
 import com.example.ui.theme.ObsidianBlack
 import com.example.ui.theme.PureWhite
@@ -68,13 +63,11 @@ import com.example.ui.viewmodel.AlAnsariUiState
 fun MoreServicesScreen(
     uiState: AlAnsariUiState,
     onNavigate: (String) -> Unit,
-    onSubmitCoverageRequest: (String, String, String, String) -> Unit,
     onShowMessage: (String) -> Unit,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    var showCoverageRequestDialog by remember { mutableStateOf(false) }
     var showSavedDialog by remember { mutableStateOf(false) }
 
     Column(
@@ -147,19 +140,18 @@ fun MoreServicesScreen(
                 }
             }
 
-            // Services List
+            // Public Services List
             items(uiState.services, key = { it.id }) { service ->
                 val icon = when (service.id) {
-                    "srv_sources" -> Icons.Filled.Tune
-                    "srv_coverage" -> Icons.Filled.Campaign
+                    "srv_booking" -> Icons.Filled.Campaign
+                    "srv_coverage" -> Icons.Filled.SettingsInputAntenna
                     "srv_saved" -> Icons.Filled.Bookmark
                     else -> Icons.Filled.LiveTv
                 }
                 AlAnsariGoldCard(
                     onClick = {
                         when (service.routeTarget) {
-                            "source_settings" -> onNavigate(AlAnsariRoutes.SOURCE_SETTINGS)
-                            "request_coverage" -> showCoverageRequestDialog = true
+                            "booking_request", "request_coverage" -> onNavigate(AlAnsariRoutes.BOOKING_REQUEST)
                             "saved_items" -> showSavedDialog = true
                             else -> onNavigate(service.routeTarget)
                         }
@@ -297,17 +289,34 @@ fun MoreServicesScreen(
                     }
                 }
             }
-        }
-    }
 
-    if (showCoverageRequestDialog) {
-        CoverageRequestDialog(
-            onDismiss = { showCoverageRequestDialog = false },
-            onSubmit = { name, gov, topic, details ->
-                onSubmitCoverageRequest(name, gov, topic, details)
-                showCoverageRequestDialog = false
-            },
-        )
+            // Discreet Owner-Only Isolated Portal Link at Bottom
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 6.dp, bottom = 10.dp),
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    TextButton(
+                        onClick = { onNavigate(AlAnsariRoutes.ADMIN_PANEL) },
+                        modifier = Modifier.testTag("admin_portal_entry"),
+                    ) {
+                        Icon(
+                            imageVector = if (uiState.isChannelOwner) Icons.Filled.AdminPanelSettings else Icons.Filled.Lock,
+                            contentDescription = null,
+                            tint = MutedGray,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "بوابة إدارة القناة (للمسؤول فقط)",
+                            style = MaterialTheme.typography.labelMedium.copy(color = MutedGray),
+                        )
+                    }
+                }
+            }
+        }
     }
 
     if (showSavedDialog) {
@@ -324,80 +333,6 @@ fun MoreServicesScreen(
             },
         )
     }
-}
-
-@Composable
-private fun CoverageRequestDialog(
-    onDismiss: () -> Unit,
-    onSubmit: (String, String, String, String) -> Unit,
-) {
-    var name by remember { mutableStateOf("") }
-    var governorate by remember { mutableStateOf("") }
-    var topic by remember { mutableStateOf("") }
-    var details by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = CardSurfaceTop,
-        title = {
-            Text("طلب تغطية ميدانية", style = MaterialTheme.typography.titleMedium.copy(color = GoldBright))
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                val colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = GoldBright,
-                    unfocusedBorderColor = GoldDarkBorder,
-                    focusedTextColor = PureWhite,
-                    unfocusedTextColor = PureWhite,
-                )
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("الاسم أو الجهة") },
-                    singleLine = true,
-                    colors = colors,
-                )
-                OutlinedTextField(
-                    value = governorate,
-                    onValueChange = { governorate = it },
-                    label = { Text("المحافظة / المدينة") },
-                    singleLine = true,
-                    colors = colors,
-                )
-                OutlinedTextField(
-                    value = topic,
-                    onValueChange = { topic = it },
-                    label = { Text("عنوان الفعالية أو الموضوع") },
-                    singleLine = true,
-                    colors = colors,
-                )
-                OutlinedTextField(
-                    value = details,
-                    onValueChange = { details = it },
-                    label = { Text("التفاصيل") },
-                    maxLines = 3,
-                    colors = colors,
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (name.isNotBlank() && topic.isNotBlank()) {
-                        onSubmit(name, governorate.ifBlank { "غير محدد" }, topic, details)
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed),
-            ) {
-                Text("إرسال الطلب", color = PureWhite)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("إلغاء", color = GoldBright)
-            }
-        },
-    )
 }
 
 @Composable

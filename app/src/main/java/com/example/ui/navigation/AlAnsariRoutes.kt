@@ -9,7 +9,8 @@ object AlAnsariRoutes {
     const val EVENTS = "events"
     const val NEWS = "news"
     const val SOCIAL = "social"
-    const val SOURCE_SETTINGS = "source_settings"
+    const val BOOKING_REQUEST = "booking_request"
+    const val ADMIN_PANEL = "admin_panel"
     const val VIDEO_PLAYER = "video_player/{videoId}"
     const val NEWS_DETAIL = "news_detail/{newsId}"
 

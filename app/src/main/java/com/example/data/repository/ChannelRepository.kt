@@ -12,6 +12,8 @@ import com.example.data.model.ProgramScheduleItem
 import com.example.data.model.SocialLink
 import com.example.data.model.SocialPlatform
 import com.example.data.model.VideoProgram
+import com.example.data.model.detectStreamProtocol
+import com.example.data.model.protocolBadgeLabel
 import com.example.data.remote.AlAnsariApiService
 import com.example.data.remote.DashboardBundleResponse
 import com.example.data.remote.YouTubeChannelFetcher
@@ -132,31 +134,39 @@ class ChannelRepository(
     fun buildLiveSources(settings: ChannelSettings): List<LiveChannelSource> {
         val list = mutableListOf<LiveChannelSource>()
         if (settings.primaryLiveUrl.isNotBlank()) {
+            val protocol = detectStreamProtocol(settings.primaryLiveUrl)
+            val protocolLabel = protocolBadgeLabel(protocol)
             list.add(
                 LiveChannelSource(
                     id = "official_primary",
-                    title = "قناة الأنصاري للإنتاج الفني – البث المباشر",
-                    subtitle = "المصدر الرسمي المُعدّ (HLS HD)",
-                    qualityLabel = "1080p HD",
+                    title = settings.liveTitle.ifBlank { "قناة الأنصاري للإنتاج الفني – البث المباشر" },
+                    subtitle = "البث الرسمي المباشر لقناة الأنصاري ($protocolLabel)",
+                    qualityLabel = protocolLabel,
                     streamUrl = settings.primaryLiveUrl,
                     isConfiguredOfficial = true,
                     currentProgram = "البث المباشر للفعاليات والمواكب",
                 )
             )
         }
+        val backupUrl = settings.backupLiveUrl.ifBlank { ChannelConfigStore.OPEN_HLS_TEST_STREAM }
+        val backupProtocolLabel = protocolBadgeLabel(detectStreamProtocol(backupUrl))
         list.add(
             LiveChannelSource(
                 id = "technical_preview",
                 title = if (settings.primaryLiveUrl.isBlank()) {
-                    "معاينة المشغل المباشر (HLS قياسي)"
+                    "البث التجريبي لقناة الأنصاري"
                 } else {
-                    "المصدر الاحتياطي / معاينة تقنية"
+                    "البث الاحتياطي للقناة"
                 },
-                subtitle = "مصدر بث HLS مفتوح لاختبار المشغل — أضف رابط .m3u8 الخاص بالقناة من زر التعديل",
-                qualityLabel = "HLS تلقائي",
-                streamUrl = settings.backupLiveUrl.ifBlank { ChannelConfigStore.OPEN_HLS_TEST_STREAM },
+                subtitle = if (settings.primaryLiveUrl.isBlank()) {
+                    "جاري عرض البث التجريبي ريثما يبدأ البث الرسمي المباشر"
+                } else {
+                    "مسار بث بديل ($backupProtocolLabel) لضمان استمرارية المشاهدة"
+                },
+                qualityLabel = backupProtocolLabel,
+                streamUrl = backupUrl,
                 isConfiguredOfficial = false,
-                currentProgram = "معاينة تقنية للبث المتكيف",
+                currentProgram = "القناة الفضائية – البث المتكيف",
             )
         )
         return list
@@ -369,18 +379,11 @@ class ChannelRepository(
 
     val servicesList: List<ChannelServiceItem> = listOf(
         ChannelServiceItem(
-            id = "srv_sources",
-            title = "إدارة مصادر القناة واليوتيوب ولوحة التحكم",
-            subtitle = "تحديث معرف قناة يوتيوب (@alansarie1)، روابط البث المباشر HLS، ورابط لوحة التحكم",
-            actionLabel = "إعداد المصادر",
-            routeTarget = "source_settings",
-        ),
-        ChannelServiceItem(
-            id = "srv_coverage",
-            title = "طلب تغطية ميدانية للمواكب والفعاليات",
-            subtitle = "تواصل مع فريق التصوير والبث الخارجي SNG1080 لرفع طلبات التغطية",
-            actionLabel = "إرسال طلب",
-            routeTarget = "request_coverage",
+            id = "srv_booking",
+            title = "طلب حجز تغطية وبث مباشر",
+            subtitle = "احجز فريق التصوير ووحدة البث الخارجي SNG1080 لتغطية المواكب والمجالس",
+            actionLabel = "حجز الآن",
+            routeTarget = "booking_request",
         ),
         ChannelServiceItem(
             id = "srv_saved",

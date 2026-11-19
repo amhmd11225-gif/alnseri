@@ -3,18 +3,14 @@ package com.example.ui.screens
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -25,46 +21,28 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.ui.components.AlAnsariGoldCard
 import com.example.ui.components.AlAnsariMediaPlayer
 import com.example.ui.components.AlAnsariSubTopBar
+import com.example.ui.components.AlAnsariYouTubePlayer
 import com.example.ui.components.CrimsonPillBadge
-import com.example.ui.theme.CardSurfaceTop
-import com.example.ui.theme.CrimsonRed
-import com.example.ui.theme.CrimsonRedDark
 import com.example.ui.theme.GoldBright
-import com.example.ui.theme.GoldDarkBorder
-import com.example.ui.theme.GoldPrimary
 import com.example.ui.theme.ObsidianBlack
 import com.example.ui.theme.PureWhite
 import com.example.ui.viewmodel.AlAnsariUiState
@@ -75,14 +53,12 @@ fun VideoPlayerScreen(
     uiState: AlAnsariUiState,
     onSelectVideo: (String) -> Unit,
     onToggleBookmark: (String) -> Unit,
-    onUpdateVideoUrl: (String, String) -> Unit,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val video = uiState.videos.firstOrNull { it.id == videoId } ?: uiState.videos.firstOrNull()
     val isBookmarked = video != null && uiState.bookmarkedVideoIds.contains(video.id)
-    var showEditUrlDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -97,16 +73,6 @@ fun VideoPlayerScreen(
             trailingAction = {
                 if (video != null) {
                     Row {
-                        IconButton(
-                            onClick = { showEditUrlDialog = true },
-                            modifier = Modifier.size(48.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Edit,
-                                contentDescription = "تعديل رابط البث المباشر للفيديو",
-                                tint = GoldBright,
-                            )
-                        }
                         IconButton(
                             onClick = { onToggleBookmark(video.id) },
                             modifier = Modifier.size(48.dp),
@@ -142,6 +108,12 @@ fun VideoPlayerScreen(
         )
 
         if (video != null) {
+            val resolvedYtId = remember(video.id, video.youtubeVideoId, video.youtubeWatchUrl) {
+                video.youtubeVideoId?.takeIf { it.isNotBlank() }
+                    ?: extractYouTubeVideoId(video.youtubeWatchUrl)
+            }
+            val watchUrl = video.youtubeWatchUrl ?: uiState.settings.youtubeUrl
+
             LazyColumn(
                 modifier = Modifier
                     .widthIn(max = 680.dp)
@@ -158,76 +130,11 @@ fun VideoPlayerScreen(
                             isLiveStream = false,
                         )
                     } else {
-                        val watchUrl = video.youtubeWatchUrl ?: uiState.settings.youtubeUrl
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(16f / 9f)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(
-                                    Brush.linearGradient(
-                                        listOf(Color(0xFF1D1710), CrimsonRedDark.copy(alpha = 0.7f), ObsidianBlack),
-                                    ),
-                                )
-                                .border(1.2.dp, GoldPrimary, RoundedCornerShape(16.dp)),
-                        ) {
-                            if (!video.thumbnailUrl.isNullOrBlank()) {
-                                AsyncImage(
-                                    model = video.thumbnailUrl,
-                                    contentDescription = video.title,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize(),
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(Color.Black.copy(alpha = 0.56f)),
-                                )
-                            }
-
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(16.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center,
-                            ) {
-                                Button(
-                                    onClick = {
-                                        runCatching {
-                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(watchUrl)))
-                                        }
-                                    },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = CrimsonRed,
-                                        contentColor = PureWhite,
-                                    ),
-                                    shape = RoundedCornerShape(50),
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp),
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "تشغيل من قناة يوتيوب (${uiState.settings.youtubeHandle})",
-                                        style = MaterialTheme.typography.labelLarge,
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(8.dp))
-                                OutlinedButton(
-                                    onClick = { showEditUrlDialog = true },
-                                    shape = RoundedCornerShape(50),
-                                ) {
-                                    Text(
-                                        text = "أو إدخال رابط .mp4 / .m3u8 للتشغيل الداخلي",
-                                        style = MaterialTheme.typography.labelMedium.copy(color = GoldBright),
-                                        textAlign = TextAlign.Center,
-                                    )
-                                }
-                            }
-                        }
+                        AlAnsariYouTubePlayer(
+                            videoId = resolvedYtId,
+                            fallbackWebUrl = watchUrl,
+                            title = video.title,
+                        )
                     }
                 }
 
@@ -259,6 +166,28 @@ fun VideoPlayerScreen(
                             text = video.description,
                             style = MaterialTheme.typography.bodyLarge,
                         )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedButton(
+                            onClick = {
+                                runCatching {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(watchUrl)))
+                                }
+                            },
+                            shape = RoundedCornerShape(50),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                                contentDescription = null,
+                                tint = GoldBright,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "فتح الفيديو على قناة يوتيوب (${uiState.settings.youtubeHandle})",
+                                color = GoldBright,
+                            )
+                        }
                     }
                 }
 
@@ -278,12 +207,21 @@ fun VideoPlayerScreen(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.PlayArrow,
-                                contentDescription = null,
-                                tint = GoldBright,
-                                modifier = Modifier.size(28.dp),
-                            )
+                            if (!related.thumbnailUrl.isNullOrBlank()) {
+                                AsyncImage(
+                                    model = related.thumbnailUrl,
+                                    contentDescription = related.title,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.size(width = 78.dp, height = 48.dp),
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Filled.PlayArrow,
+                                    contentDescription = null,
+                                    tint = GoldBright,
+                                    modifier = Modifier.size(28.dp),
+                                )
+                            }
                             Spacer(modifier = Modifier.width(10.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
@@ -301,46 +239,19 @@ fun VideoPlayerScreen(
             }
         }
     }
+}
 
-    if (showEditUrlDialog && video != null) {
-        var urlInput by remember(video.id) { mutableStateOf(video.videoUrl) }
-        AlertDialog(
-            onDismissRequest = { showEditUrlDialog = false },
-            containerColor = CardSurfaceTop,
-            title = {
-                Text("رابط التشغيل المباشر للفيديو", style = MaterialTheme.typography.titleMedium.copy(color = GoldBright))
-            },
-            text = {
-                OutlinedTextField(
-                    value = urlInput,
-                    onValueChange = { urlInput = it },
-                    label = { Text("رابط مباشر (.mp4 أو .m3u8)") },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GoldBright,
-                        unfocusedBorderColor = GoldDarkBorder,
-                        focusedTextColor = PureWhite,
-                        unfocusedTextColor = PureWhite,
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        onUpdateVideoUrl(video.id, urlInput)
-                        showEditUrlDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed),
-                ) {
-                    Text("حفظ", color = PureWhite)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showEditUrlDialog = false }) {
-                    Text("إلغاء", color = GoldBright)
-                }
-            },
-        )
+internal fun extractYouTubeVideoId(url: String?): String? {
+    if (url.isNullOrBlank()) return null
+    val patterns = listOf(
+        Regex("""(?:v=|/)([a-zA-Z0-9_-]{11})(?:[?&/#]|$)"""),
+        Regex("""youtu\.be/([a-zA-Z0-9_-]{11})"""),
+        Regex("""embed/([a-zA-Z0-9_-]{11})"""),
+        Regex("""shorts/([a-zA-Z0-9_-]{11})"""),
+    )
+    for (regex in patterns) {
+        val found = regex.find(url)?.groupValues?.getOrNull(1)
+        if (!found.isNullOrBlank()) return found
     }
+    return null
 }

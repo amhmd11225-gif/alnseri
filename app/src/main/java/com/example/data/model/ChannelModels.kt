@@ -1,5 +1,10 @@
 package com.example.data.model
 
+import androidx.annotation.Keep
+import com.google.firebase.Timestamp
+import com.google.firebase.firestore.DocumentId
+import com.google.firebase.firestore.IgnoreExtraProperties
+import com.google.firebase.firestore.ServerTimestamp
 import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
@@ -115,9 +120,37 @@ data class ChannelServiceItem(
     val routeTarget: String,
 )
 
+enum class StreamProtocol {
+    HLS,
+    RTMP,
+    SRT,
+    RTSP,
+    VOD_HTTP,
+}
+
+fun detectStreamProtocol(url: String): StreamProtocol {
+    val clean = url.trim().lowercase()
+    return when {
+        clean.startsWith("srt://") -> StreamProtocol.SRT
+        clean.startsWith("rtmp://") || clean.startsWith("rtmps://") -> StreamProtocol.RTMP
+        clean.startsWith("rtsp://") || clean.startsWith("udp://") -> StreamProtocol.RTSP
+        clean.contains(".m3u8") -> StreamProtocol.HLS
+        else -> StreamProtocol.VOD_HTTP
+    }
+}
+
+fun protocolBadgeLabel(protocol: StreamProtocol): String = when (protocol) {
+    StreamProtocol.SRT -> "SRT مباشر"
+    StreamProtocol.RTMP -> "RTMP مباشر"
+    StreamProtocol.RTSP -> "RTSP مباشر"
+    StreamProtocol.HLS -> "HLS HD"
+    StreamProtocol.VOD_HTTP -> "بث مباشر"
+}
+
 data class ChannelSettings(
     val primaryLiveUrl: String,
     val backupLiveUrl: String,
+    val liveTitle: String = "قناة الأنصاري للإنتاج الفني – البث المباشر",
     val cmsApiBaseUrl: String,
     val lastSyncedTimestamp: String,
     val facebookUrl: String,
@@ -130,6 +163,49 @@ data class ChannelSettings(
     val youtubeHandle: String,
 )
 
+@Keep
+@IgnoreExtraProperties
+data class CloudChannelConfig(
+    @DocumentId val id: String = "",
+    val primaryLiveUrl: String = "",
+    val backupLiveUrl: String = "",
+    val liveTitle: String = "قناة الأنصاري للإنتاج الفني – البث المباشر",
+    val youtubeHandle: String = "@alansarie1",
+    val youtubeChannelId: String = "UCbZnqtO8B64mMhTzTXIxqUA",
+    val facebookUrl: String = "",
+    val telegramUrl: String = "",
+    val tiktokUrl: String = "",
+    val instagramUrl: String = "",
+    val satelliteFrequency: String = "",
+    val updatedByUid: String = "",
+    @ServerTimestamp val updatedAt: Timestamp? = null,
+)
+
+@Keep
+@IgnoreExtraProperties
+data class CoverageBookingRequest(
+    @DocumentId val id: String = "",
+    val userId: String = "",
+    val senderName: String = "",
+    val phone: String = "",
+    val governorate: String = "",
+    val serviceType: String = "تغطية وبث مباشر",
+    val eventDate: String = "",
+    val topic: String = "",
+    val details: String? = null,
+    val status: String = "pending",
+    val adminNote: String? = null,
+    @ServerTimestamp val createdAt: Timestamp? = null,
+    @ServerTimestamp val updatedAt: Timestamp? = null,
+)
+
+fun bookingStatusArabic(status: String): String = when (status) {
+    "confirmed" -> "مؤكد"
+    "completed" -> "مكتمل"
+    "declined" -> "معتذر عنه"
+    else -> "قيد المراجعة"
+}
+
 data class CoverageRequestRecord(
     val id: String,
     val senderName: String,
@@ -138,3 +214,4 @@ data class CoverageRequestRecord(
     val details: String,
     val createdAt: String,
 )
+
