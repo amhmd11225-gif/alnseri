@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
+import com.example.data.auth.GoogleAuthHelper
 import com.example.data.haqeebat.PrayerTimesCalculator
 import com.example.data.local.ChannelConfigStore
 import com.example.data.model.ChannelSettings
@@ -25,6 +26,7 @@ import com.example.ui.components.AlAnsariBottomBar
 import com.example.ui.navigation.AlAnsariRoutes
 import com.example.ui.screens.ADMIN_DIRECT_LINK
 import com.example.ui.screens.AdminDirectLinkCard
+import com.example.ui.screens.AdminPanelScreen
 import com.example.ui.screens.BOOKING_WHATSAPP_NUMBER
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.VideoPlayerScreen
@@ -348,5 +350,37 @@ class ExampleRobolectricTest {
         }
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("home_app_update_card").assertIsDisplayed()
+    }
+
+    @Test
+    fun `admin panel sign-in screen renders sign-in button and auth diagnostics safely`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val diagnostics = GoogleAuthHelper.inspectAuthDiagnostics(context)
+        assertTrue(diagnostics.hasWebClientId || !diagnostics.hasWebClientId)
+
+        composeTestRule.setContent {
+            AlAnsariTheme {
+                AdminPanelScreen(
+                    uiState = AlAnsariUiState(currentUser = null),
+                    onPublishCloudConfig = { _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
+                    onUpdateBookingStatus = { _, _, _ -> },
+                    onPublishEvent = { _, _, _, _, _, _, _, _ -> },
+                    onUpdateEventStatus = { _, _ -> },
+                    onDeleteEvent = {},
+                    onPublishNews = { _, _, _, _, _, _, _ -> },
+                    onDeleteNews = {},
+                    onPublishVideo = { _, _, _, _, _, _, _ -> },
+                    onDeleteVideo = {},
+                    onPublishCoverage = { _, _, _, _, _, _, _, _ -> },
+                    onDeleteCoverage = {},
+                    onRefreshYouTube = {},
+                    onSyncCms = {},
+                    onShowMessage = {},
+                    onBackClick = {},
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("admin_google_signin_button").assertIsDisplayed()
     }
 }

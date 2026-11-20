@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccountCircle
@@ -41,6 +43,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -153,6 +156,10 @@ fun AdminPanelScreen(
 
         when {
             uiState.currentUser == null -> {
+                var isSigningIn by remember { mutableStateOf(false) }
+                var authFeedbackMessage by remember { mutableStateOf<String?>(null) }
+                val authDiagnostics = remember(context) { GoogleAuthHelper.inspectAuthDiagnostics(context) }
+
                 Box(
                     modifier = Modifier
                         .widthIn(max = 560.dp)
@@ -184,14 +191,30 @@ fun AdminPanelScreen(
                             )
                             Button(
                                 onClick = {
+                                    isSigningIn = true
+                                    authFeedbackMessage = null
                                     GoogleAuthHelper.onGoogleSignInClicked(
                                         context = context,
                                         credentialManager = credentialManager,
                                         scope = coroutineScope,
-                                        onAuthSuccess = { onShowMessage("تم تسجيل الدخول بنجاح") },
-                                        onAuthError = { msg -> onShowMessage(msg) },
+                                        onAuthSuccess = {
+                                            isSigningIn = false
+                                            authFeedbackMessage = null
+                                            onShowMessage("تم تسجيل الدخول بنجاح")
+                                        },
+                                        onAuthError = { msg ->
+                                            isSigningIn = false
+                                            authFeedbackMessage = msg
+                                            onShowMessage(msg)
+                                        },
+                                        onAuthCancelled = { reason ->
+                                            isSigningIn = false
+                                            authFeedbackMessage = reason
+                                            onShowMessage(reason)
+                                        },
                                     )
                                 },
+                                enabled = !isSigningIn,
                                 colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed, contentColor = PureWhite),
                                 shape = RoundedCornerShape(50),
                                 modifier = Modifier
@@ -199,9 +222,64 @@ fun AdminPanelScreen(
                                     .height(50.dp)
                                     .testTag("admin_google_signin_button"),
                             ) {
-                                Icon(Icons.Filled.AccountCircle, contentDescription = null, modifier = Modifier.size(20.dp))
+                                if (isSigningIn) {
+                                    CircularProgressIndicator(
+                                        color = PureWhite,
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp,
+                                    )
+                                } else {
+                                    Icon(Icons.Filled.AccountCircle, contentDescription = null, modifier = Modifier.size(20.dp))
+                                }
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("تسجيل الدخول بحساب Google", style = MaterialTheme.typography.labelLarge)
+                                Text(
+                                    text = if (isSigningIn) "جاري فتح نافذة Google..." else "تسجيل الدخول بحساب Google",
+                                    style = MaterialTheme.typography.labelLarge,
+                                )
+                            }
+
+                            if (authFeedbackMessage != null || !authDiagnostics.hasFirebaseApp || !authDiagnostics.hasWebClientId) {
+                                Surface(
+                                    color = CrimsonRed.copy(alpha = 0.14f),
+                                    shape = RoundedCornerShape(14.dp),
+                                    border = BorderStroke(1.dp, CrimsonRed.copy(alpha = 0.6f)),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("admin_signin_diagnostic_box"),
+                                ) {
+                                    SelectionContainer {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(12.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                                        ) {
+                                            if (authFeedbackMessage != null) {
+                                                Text(
+                                                    text = authFeedbackMessage.orEmpty(),
+                                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                                        color = PureWhite,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                    ),
+                                                )
+                                            }
+                                            Text(
+                                                text = "حالة إعدادات Firebase: " + if (authDiagnostics.hasFirebaseApp && authDiagnostics.hasWebClientId) {
+                                                    "مدمجة ✓"
+                                                } else {
+                                                    "غير مدمجة ✗ (أعد البناء مع google-services.json)"
+                                                },
+                                                style = MaterialTheme.typography.labelMedium.copy(color = GoldBright),
+                                            )
+                                            if (!authDiagnostics.appSigningSha1.isNullOrBlank()) {
+                                                Text(
+                                                    text = "بصمة التوقيع للنسخة (SHA-1):\n${authDiagnostics.appSigningSha1}",
+                                                    style = MaterialTheme.typography.labelSmall.copy(color = MutedGray),
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

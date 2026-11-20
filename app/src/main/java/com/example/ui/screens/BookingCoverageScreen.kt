@@ -144,6 +144,7 @@ fun BookingCoverageScreen(
     var eventDate by remember { mutableStateOf("") }
     var topic by remember { mutableStateOf("") }
     var details by remember { mutableStateOf("") }
+    var isSigningIn by remember { mutableStateOf(false) }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = GoldBright,
@@ -225,13 +226,23 @@ fun BookingCoverageScreen(
         }
 
         if (uiState.currentUser == null) {
+            isSigningIn = true
             GoogleAuthHelper.onGoogleSignInClicked(
                 context = context,
                 credentialManager = credentialManager,
                 scope = coroutineScope,
-                onAuthSuccess = { doSend() },
-                onAuthError = { msg -> onShowMessage(msg) },
-                onAuthCancelled = { onShowMessage("يتطلب توثيق الطلب تأكيد Google، أو يمكنك الإرسال لواتساب مباشرة") },
+                onAuthSuccess = {
+                    isSigningIn = false
+                    doSend()
+                },
+                onAuthError = { msg ->
+                    isSigningIn = false
+                    onShowMessage(msg)
+                },
+                onAuthCancelled = { _ ->
+                    isSigningIn = false
+                    onShowMessage("يتطلب توثيق الطلب تأكيد Google، أو يمكنك الإرسال لواتساب مباشرة")
+                },
             )
         } else {
             doSend()
@@ -318,29 +329,50 @@ fun BookingCoverageScreen(
                             )
                             OutlinedButton(
                                 onClick = {
+                                    isSigningIn = true
                                     GoogleAuthHelper.onGoogleSignInClicked(
                                         context = context,
                                         credentialManager = credentialManager,
                                         scope = coroutineScope,
                                         onAuthSuccess = {
+                                            isSigningIn = false
                                             onShowMessage("تم تسجيل الدخول بنجاح، يمكنك الآن إرسال الطلب")
                                         },
-                                        onAuthError = { msg -> onShowMessage(msg) },
+                                        onAuthError = { msg ->
+                                            isSigningIn = false
+                                            onShowMessage(msg)
+                                        },
+                                        onAuthCancelled = { reason ->
+                                            isSigningIn = false
+                                            onShowMessage(reason)
+                                        },
                                     )
                                 },
+                                enabled = !isSigningIn,
                                 shape = RoundedCornerShape(50),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .testTag("booking_google_signin_button"),
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.AccountCircle,
-                                    contentDescription = null,
-                                    tint = GoldBright,
-                                    modifier = Modifier.size(20.dp),
-                                )
+                                if (isSigningIn) {
+                                    CircularProgressIndicator(
+                                        color = GoldBright,
+                                        modifier = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp,
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Filled.AccountCircle,
+                                        contentDescription = null,
+                                        tint = GoldBright,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("تسجيل الدخول بحساب Google", color = GoldBright)
+                                Text(
+                                    text = if (isSigningIn) "جاري فتح نافذة Google..." else "تسجيل الدخول بحساب Google",
+                                    color = GoldBright,
+                                )
                             }
                         }
                     }
@@ -441,7 +473,7 @@ fun BookingCoverageScreen(
 
                     Button(
                         onClick = { submitNow() },
-                        enabled = !uiState.isSavingCloud,
+                        enabled = !uiState.isSavingCloud && !isSigningIn,
                         colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed, contentColor = PureWhite),
                         shape = RoundedCornerShape(50),
                         modifier = Modifier
