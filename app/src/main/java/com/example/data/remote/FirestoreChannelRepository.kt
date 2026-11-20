@@ -97,6 +97,9 @@ class FirestoreChannelRepository(
             val cleanTt = config.tiktokUrl.trim().take(300)
             val cleanIg = config.instagramUrl.trim().take(300)
             val cleanFreq = config.satelliteFrequency.trim().take(150)
+            val cleanAnnouncement = config.homeAnnouncement.trim().take(500)
+            val cleanLatestVersion = config.latestAppVersion.trim().take(40)
+            val cleanUpdateUrl = config.appUpdateUrl.trim().take(1000)
 
             val payload = mapOf(
                 "primaryLiveUrl" to cleanPrimary,
@@ -109,6 +112,9 @@ class FirestoreChannelRepository(
                 "tiktokUrl" to cleanTt,
                 "instagramUrl" to cleanIg,
                 "satelliteFrequency" to cleanFreq,
+                "homeAnnouncement" to cleanAnnouncement,
+                "latestAppVersion" to cleanLatestVersion,
+                "appUpdateUrl" to cleanUpdateUrl,
                 "updatedByUid" to user.uid,
                 "updatedAt" to FieldValue.serverTimestamp(),
             )

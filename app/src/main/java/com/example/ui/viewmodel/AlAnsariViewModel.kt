@@ -296,6 +296,9 @@ class AlAnsariViewModel(
                 websiteUrl = cloudConfig.instagramUrl.ifBlank { localSettings.websiteUrl },
                 youtubeUrl = "https://www.youtube.com/${cloudConfig.youtubeHandle.ifBlank { localSettings.youtubeHandle }}",
                 satelliteFrequency = cloudConfig.satelliteFrequency.ifBlank { localSettings.satelliteFrequency },
+                homeAnnouncement = cloudConfig.homeAnnouncement,
+                latestAppVersion = cloudConfig.latestAppVersion,
+                appUpdateUrl = cloudConfig.appUpdateUrl,
             )
         } else {
             localSettings
@@ -455,6 +458,9 @@ class AlAnsariViewModel(
         tiktokUrl: String,
         instagramUrl: String,
         satelliteFrequency: String,
+        homeAnnouncement: String = "",
+        latestAppVersion: String = "",
+        appUpdateUrl: String = "",
     ) {
         viewModelScope.launch {
             isSavingCloudFlow.value = true
@@ -469,6 +475,9 @@ class AlAnsariViewModel(
                 tiktokUrl = tiktokUrl,
                 instagramUrl = instagramUrl,
                 satelliteFrequency = satelliteFrequency,
+                homeAnnouncement = homeAnnouncement,
+                latestAppVersion = latestAppVersion,
+                appUpdateUrl = appUpdateUrl,
             )
             val result = firestoreRepository.publishChannelConfig(config)
             isSavingCloudFlow.value = false

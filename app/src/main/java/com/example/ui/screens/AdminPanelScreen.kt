@@ -99,6 +99,9 @@ fun AdminPanelScreen(
         tiktokUrl: String,
         instagramUrl: String,
         satelliteFrequency: String,
+        homeAnnouncement: String,
+        latestAppVersion: String,
+        appUpdateUrl: String,
     ) -> Unit,
     onUpdateBookingStatus: (requestId: String, newStatus: String, adminNote: String?) -> Unit,
     onPublishEvent: (String, String, String, String, String, String, String, () -> Unit) -> Unit,
@@ -278,7 +281,7 @@ fun AdminPanelScreen(
 @Composable
 private fun AdminOwnerDashboardContent(
     uiState: AlAnsariUiState,
-    onPublishCloudConfig: (String, String, String, String, String, String, String, String, String, String) -> Unit,
+    onPublishCloudConfig: (String, String, String, String, String, String, String, String, String, String, String, String, String) -> Unit,
     onUpdateBookingStatus: (String, String, String?) -> Unit,
     onPublishEvent: (String, String, String, String, String, String, String, () -> Unit) -> Unit,
     onUpdateEventStatus: (String, String) -> Unit,
@@ -304,6 +307,9 @@ private fun AdminOwnerDashboardContent(
     var tiktokUrl by remember(uiState.settings.tiktokUrl) { mutableStateOf(uiState.settings.tiktokUrl) }
     var instagramUrl by remember(uiState.settings.websiteUrl) { mutableStateOf(uiState.settings.websiteUrl) }
     var frequency by remember(uiState.settings.satelliteFrequency) { mutableStateOf(uiState.settings.satelliteFrequency) }
+    var homeAnnouncement by remember(uiState.settings.homeAnnouncement) { mutableStateOf(uiState.settings.homeAnnouncement) }
+    var latestAppVersion by remember(uiState.settings.latestAppVersion) { mutableStateOf(uiState.settings.latestAppVersion) }
+    var appUpdateUrl by remember(uiState.settings.appUpdateUrl) { mutableStateOf(uiState.settings.appUpdateUrl) }
     var cmsApiUrl by remember(uiState.settings.cmsApiBaseUrl) { mutableStateOf(uiState.settings.cmsApiBaseUrl) }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
@@ -329,6 +335,9 @@ private fun AdminOwnerDashboardContent(
             tiktokUrl,
             instagramUrl,
             frequency,
+            homeAnnouncement,
+            latestAppVersion,
+            appUpdateUrl,
         )
     }
 
@@ -505,6 +514,66 @@ private fun AdminOwnerDashboardContent(
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text("مسح الرابط الرئيسي (تشغيل الاحتياطي)", color = GoldBright)
                             }
+                        }
+                    }
+                }
+
+                item {
+                    AlAnsariGoldCard {
+                        Text(
+                            text = "تنبيه الصفحة الرئيسية وتحديث التطبيق للمستخدمين",
+                            style = MaterialTheme.typography.titleMedium.copy(color = GoldBright),
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "أي إعلان تكتبه هنا يظهر فوراً في الصفحة الرئيسية عند جميع من ثبّت التطبيق. وإذا رفعت نسخة APK جديدة اكتب رقمها ورابطها ليظهر لهم زر التحميل مباشرة.",
+                            style = MaterialTheme.typography.bodyMedium.copy(color = MutedGray, fontSize = 12.sp),
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = homeAnnouncement,
+                            onValueChange = { homeAnnouncement = it },
+                            label = { Text("إعلان أو تفاصيل جديدة بالواجهة الرئيسية") },
+                            placeholder = { Text("مثال: نقل مباشر لمجلس العزاء الليلة الساعة 8 مساءً") },
+                            minLines = 2,
+                            colors = fieldColors,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("admin_home_announcement_input"),
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = latestAppVersion,
+                                onValueChange = { latestAppVersion = it },
+                                label = { Text("رقم الإصدار الجديد (اختياري)") },
+                                placeholder = { Text("1.1") },
+                                singleLine = true,
+                                colors = fieldColors,
+                                modifier = Modifier.weight(1f),
+                            )
+                            OutlinedTextField(
+                                value = appUpdateUrl,
+                                onValueChange = { appUpdateUrl = it },
+                                label = { Text("رابط تحميل التحديث (اختياري)") },
+                                placeholder = { Text("https://...") },
+                                singleLine = true,
+                                colors = fieldColors,
+                                modifier = Modifier.weight(1.4f),
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Button(
+                            onClick = { publishAll() },
+                            enabled = !uiState.isSavingCloud,
+                            colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed, contentColor = PureWhite),
+                            shape = RoundedCornerShape(50),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .testTag("admin_publish_announcement_button"),
+                        ) {
+                            Text("نشر الإعلان والتفاصيل للجميع الآن", style = MaterialTheme.typography.labelLarge)
                         }
                     }
                 }

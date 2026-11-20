@@ -333,4 +333,20 @@ class ExampleRobolectricTest {
         composeTestRule.onNodeWithTag("admin_share_link_button").assertIsDisplayed()
         composeTestRule.onNodeWithTag("admin_pin_shortcut_button").assertIsDisplayed()
     }
+
+    @Test
+    fun `home screen displays live announcement and app update banner from cloud config`() {
+        composeTestRule.setContent {
+            AlAnsariTheme {
+                HomeScreen(
+                    onNavigate = {},
+                    homeAnnouncement = "بث مباشر لمجلس العزاء الليلة",
+                    latestAppVersion = "2.0",
+                    appUpdateUrl = "https://github.com/amhmd11225-gif/alnseri/releases",
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("home_app_update_card").assertIsDisplayed()
+    }
 }

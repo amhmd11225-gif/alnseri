@@ -147,6 +147,9 @@ test("Channel config: verified owner can create & update RTMP/SRT/HLS stream, re
   await assertSucceeds(
     ownerDb.collection("channel_config").doc("live").update({
       primaryLiveUrl: "srt://sng1080.example.com:9000?mode=caller",
+      homeAnnouncement: "تغطية خاصة الليلة الساعة 8 مساءً",
+      latestAppVersion: "1.1",
+      appUpdateUrl: "https://github.com/amhmd11225-gif/alnseri/releases",
       updatedByUid: OWNER_UID,
       updatedAt: new Date(Date.now() - 500),
     })

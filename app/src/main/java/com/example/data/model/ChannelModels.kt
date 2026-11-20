@@ -161,6 +161,9 @@ data class ChannelSettings(
     val satelliteFrequency: String,
     val youtubeChannelId: String,
     val youtubeHandle: String,
+    val homeAnnouncement: String = "",
+    val latestAppVersion: String = "",
+    val appUpdateUrl: String = "",
 )
 
 @Keep
@@ -177,6 +180,9 @@ data class CloudChannelConfig(
     val tiktokUrl: String = "",
     val instagramUrl: String = "",
     val satelliteFrequency: String = "",
+    val homeAnnouncement: String = "",
+    val latestAppVersion: String = "",
+    val appUpdateUrl: String = "",
     val updatedByUid: String = "",
     @ServerTimestamp val updatedAt: Timestamp? = null,
 )

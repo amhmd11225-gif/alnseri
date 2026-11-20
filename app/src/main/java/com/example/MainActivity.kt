@@ -218,6 +218,10 @@ fun AlAnsariApp() {
                         channelLogoUrl = uiState.channelLogoUrl,
                         channelTitle = uiState.channelTitle,
                         channelHandle = uiState.settings.youtubeHandle,
+                        liveTitle = uiState.settings.liveTitle,
+                        homeAnnouncement = uiState.settings.homeAnnouncement,
+                        latestAppVersion = uiState.settings.latestAppVersion,
+                        appUpdateUrl = uiState.settings.appUpdateUrl,
                     )
                 }
 

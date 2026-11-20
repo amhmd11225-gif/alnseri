@@ -43,6 +43,9 @@ service cloud.firestore {
              data.tiktokUrl is string && data.tiktokUrl.size() <= 300 &&
              data.instagramUrl is string && data.instagramUrl.size() <= 300 &&
              data.satelliteFrequency is string && data.satelliteFrequency.size() <= 150 &&
+             (!('homeAnnouncement' in data) || (data.homeAnnouncement is string && data.homeAnnouncement.size() <= 500)) &&
+             (!('latestAppVersion' in data) || (data.latestAppVersion is string && data.latestAppVersion.size() <= 40)) &&
+             (!('appUpdateUrl' in data) || (data.appUpdateUrl is string && data.appUpdateUrl.size() <= 1000)) &&
              data.updatedByUid is string && data.updatedByUid.size() >= 1 && data.updatedByUid.size() <= 128 &&
              data.updatedAt is timestamp && data.updatedAt <= request.time;
     }
@@ -140,7 +143,9 @@ service cloud.firestore {
                          'primaryLiveUrl', 'backupLiveUrl', 'liveTitle',
                          'youtubeHandle', 'youtubeChannelId', 'facebookUrl',
                          'telegramUrl', 'tiktokUrl', 'instagramUrl',
-                         'satelliteFrequency', 'updatedByUid', 'updatedAt'
+                         'satelliteFrequency', 'homeAnnouncement',
+                         'latestAppVersion', 'appUpdateUrl',
+                         'updatedByUid', 'updatedAt'
                        ]) &&
                        isValidChannelConfig(incoming());
 
@@ -152,7 +157,9 @@ service cloud.firestore {
                          'primaryLiveUrl', 'backupLiveUrl', 'liveTitle',
                          'youtubeHandle', 'youtubeChannelId', 'facebookUrl',
                          'telegramUrl', 'tiktokUrl', 'instagramUrl',
-                         'satelliteFrequency', 'updatedByUid', 'updatedAt'
+                         'satelliteFrequency', 'homeAnnouncement',
+                         'latestAppVersion', 'appUpdateUrl',
+                         'updatedByUid', 'updatedAt'
                        ]);
 
       allow delete: if isChannelOwner() && isValidId(configId);

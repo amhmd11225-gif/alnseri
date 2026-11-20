@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,9 +21,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -32,6 +39,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -41,6 +49,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.BuildConfig
 import com.example.R
 import com.example.ui.components.AlAnsari3DTileCard
 import com.example.ui.components.AlAnsariGoldCard
@@ -82,8 +91,13 @@ fun HomeScreen(
     channelLogoUrl: String? = null,
     channelTitle: String = "قناة الأنصاري للإنتاج الفني",
     channelHandle: String = "@alansarie1",
+    liveTitle: String = "",
+    homeAnnouncement: String = "",
+    latestAppVersion: String = "",
+    appUpdateUrl: String = "",
 ) {
     val scrollState = rememberScrollState()
+    val context = LocalContext.current
 
     Box(
         modifier = modifier
@@ -166,6 +180,78 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(6.dp))
 
+            val hasAppUpdate = latestAppVersion.isNotBlank() &&
+                latestAppVersion.trim() != BuildConfig.VERSION_NAME &&
+                appUpdateUrl.isNotBlank()
+
+            if (hasAppUpdate) {
+                AlAnsariGoldCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    testTag = "home_app_update_card",
+                    cornerRadius = 16.dp,
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Filled.SystemUpdate, contentDescription = null, tint = GoldBright, modifier = Modifier.size(26.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "تتوفر نسخة جديدة ($latestAppVersion)",
+                                    style = MaterialTheme.typography.titleSmall.copy(color = GoldBright, fontWeight = FontWeight.Bold),
+                                )
+                                if (homeAnnouncement.isNotBlank()) {
+                                    Text(
+                                        text = homeAnnouncement,
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp),
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                runCatching {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(appUpdateUrl.trim())))
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed, contentColor = PureWhite),
+                            shape = RoundedCornerShape(50),
+                        ) {
+                            Text("تحديث", fontSize = 12.sp)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            } else if (homeAnnouncement.isNotBlank()) {
+                AlAnsariGoldCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    testTag = "home_live_announcement_card",
+                    cornerRadius = 16.dp,
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Filled.NotificationsActive, contentDescription = "إعلان القناة", tint = GoldBright, modifier = Modifier.size(22.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = homeAnnouncement,
+                            style = MaterialTheme.typography.bodyMedium.copy(color = PureWhite, fontWeight = FontWeight.SemiBold),
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
             // Featured Full-Width 3D Live Broadcast Card
             AlAnsariGoldCard(
                 modifier = Modifier.fillMaxWidth(),
@@ -195,7 +281,7 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         CrimsonPillBadge(
-                            text = stringResource(R.string.live_subtitle),
+                            text = liveTitle.ifBlank { stringResource(R.string.live_subtitle) },
                             horizontalPadding = 16.dp,
                             verticalPadding = 3.dp,
                         )

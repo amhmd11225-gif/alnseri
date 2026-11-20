@@ -15,6 +15,9 @@
         "tiktokUrl": { "type": "string" },
         "instagramUrl": { "type": "string" },
         "satelliteFrequency": { "type": "string" },
+        "homeAnnouncement": { "type": "string" },
+        "latestAppVersion": { "type": "string" },
+        "appUpdateUrl": { "type": "string" },
         "updatedByUid": { "type": "string" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
