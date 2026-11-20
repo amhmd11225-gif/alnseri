@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
+import com.example.data.haqeebat.PrayerTimesCalculator
 import com.example.data.local.ChannelConfigStore
 import com.example.data.model.ChannelSettings
 import com.example.data.model.StreamProtocol
@@ -178,5 +179,64 @@ class ExampleRobolectricTest {
         assertEquals("SRT مباشر", sources.first().qualityLabel)
         assertEquals("@alansarie1", ChannelConfigStore.DEFAULT_YOUTUBE_HANDLE)
         assertEquals("UCbZnqtO8B64mMhTzTXIxqUA", ChannelConfigStore.DEFAULT_YOUTUBE_CHANNEL_ID)
+    }
+
+    @Test
+    fun `home screen renders all eight haqeebat almumin 3d tiles and routes on click`() {
+        val navigatedRoutes = mutableListOf<String>()
+
+        composeTestRule.setContent {
+            AlAnsariTheme {
+                HomeScreen(onNavigate = { navigatedRoutes.add(it) })
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        val haqeebatTags = listOf(
+            "home_card_quran",
+            "home_card_duas",
+            "home_card_ziyarat",
+            "home_card_prayer_times",
+            "home_card_qibla",
+            "home_card_tasbeeh",
+            "home_card_hijri_calendar",
+            "home_card_istikhara",
+        )
+
+        haqeebatTags.forEach { tag ->
+            composeTestRule.onNodeWithTag(tag).performScrollTo()
+            composeTestRule.onNodeWithTag(tag).assertIsDisplayed()
+            composeTestRule.onNodeWithTag(tag).performClick()
+        }
+
+        assertEquals(
+            listOf(
+                AlAnsariRoutes.QURAN,
+                AlAnsariRoutes.DUAS,
+                AlAnsariRoutes.ZIYARAT,
+                AlAnsariRoutes.PRAYER_TIMES,
+                AlAnsariRoutes.QIBLA,
+                AlAnsariRoutes.TASBEEH,
+                AlAnsariRoutes.HIJRI_CALENDAR,
+                AlAnsariRoutes.ISTIKHARA_FIQH,
+            ),
+            navigatedRoutes,
+        )
+    }
+
+    @Test
+    fun `prayer times and qibla calculator produce valid iraqi astronomical schedule`() {
+        val najaf = PrayerTimesCalculator.cityById("najaf")
+        val qiblaDeg = PrayerTimesCalculator.calculateQiblaBearing(najaf.lat, najaf.lon)
+        assertTrue(qiblaDeg in 190f..215f)
+
+        val schedule = PrayerTimesCalculator.calculateForDate(najaf)
+        assertTrue(schedule.imsaakMinutes < schedule.fajrMinutes)
+        assertTrue(schedule.fajrMinutes < schedule.sunriseMinutes)
+        assertTrue(schedule.sunriseMinutes < schedule.dhuhrMinutes)
+        assertTrue(schedule.dhuhrMinutes < schedule.asrMinutes)
+        assertTrue(schedule.asrMinutes < schedule.sunsetMinutes)
+        assertTrue(schedule.sunsetMinutes <= schedule.maghribMinutes)
+        assertTrue(schedule.maghribMinutes < schedule.ishaMinutes)
     }
 }

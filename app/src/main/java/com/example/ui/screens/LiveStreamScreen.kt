@@ -31,6 +31,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.remote.YouTubeStreamResolver
 import com.example.ui.components.AlAnsariGoldCard
 import com.example.ui.components.AlAnsariMediaPlayer
 import com.example.ui.components.AlAnsariSubTopBar
@@ -65,6 +67,16 @@ fun LiveStreamScreen(
     val activeSource = uiState.liveSources.firstOrNull { it.id == uiState.selectedLiveSourceId }
         ?: uiState.liveSources.firstOrNull()
     var playYouTubeLiveInApp by remember { mutableStateOf(false) }
+    var resolvedYtLiveUrl by remember(uiState.youtubeLiveVideoId) { mutableStateOf<String?>(null) }
+    var ytLiveExoFallback by remember(uiState.youtubeLiveVideoId) { mutableStateOf(false) }
+
+    LaunchedEffect(playYouTubeLiveInApp, uiState.youtubeLiveVideoId) {
+        val liveId = uiState.youtubeLiveVideoId
+        if (playYouTubeLiveInApp && !liveId.isNullOrBlank() && resolvedYtLiveUrl == null) {
+            ytLiveExoFallback = false
+            resolvedYtLiveUrl = YouTubeStreamResolver.resolveDirectStreamUrl(liveId)
+        }
+    }
 
     Column(
         modifier = modifier
@@ -88,11 +100,20 @@ fun LiveStreamScreen(
         ) {
             item {
                 if (playYouTubeLiveInApp && !uiState.youtubeLiveVideoId.isNullOrBlank()) {
-                    AlAnsariYouTubePlayer(
-                        videoId = uiState.youtubeLiveVideoId,
-                        fallbackWebUrl = "https://www.youtube.com/${uiState.settings.youtubeHandle}/live",
-                        title = "البث المباشر على يوتيوب (${uiState.settings.youtubeHandle})",
-                    )
+                    if (!resolvedYtLiveUrl.isNullOrBlank() && !ytLiveExoFallback) {
+                        AlAnsariMediaPlayer(
+                            streamUrl = resolvedYtLiveUrl.orEmpty(),
+                            title = "البث المباشر على يوتيوب (${uiState.settings.youtubeHandle})",
+                            isLiveStream = true,
+                            onPlaybackError = { ytLiveExoFallback = true },
+                        )
+                    } else {
+                        AlAnsariYouTubePlayer(
+                            videoId = uiState.youtubeLiveVideoId,
+                            fallbackWebUrl = "https://www.youtube.com/${uiState.settings.youtubeHandle}/live",
+                            title = "البث المباشر على يوتيوب (${uiState.settings.youtubeHandle})",
+                        )
+                    }
                 } else {
                     AlAnsariMediaPlayer(
                         streamUrl = activeSource?.streamUrl.orEmpty(),

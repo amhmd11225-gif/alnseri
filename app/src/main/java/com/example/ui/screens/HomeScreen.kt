@@ -42,19 +42,36 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.R
+import com.example.ui.components.AlAnsari3DTileCard
 import com.example.ui.components.AlAnsariGoldCard
 import com.example.ui.components.CrimsonPillBadge
+import com.example.ui.components.DuaHands3DIcon
 import com.example.ui.components.EventsCalendarIcon
 import com.example.ui.components.FieldCoverageCameraIcon
+import com.example.ui.components.HijriCrescentCalendar3DIcon
+import com.example.ui.components.HomeSectionHeader
+import com.example.ui.components.IstikharaQuranStar3DIcon
 import com.example.ui.components.LiveBroadcastTvIcon
 import com.example.ui.components.NewsNewspaperIcon
+import com.example.ui.components.PrayerTimesCrescent3DIcon
+import com.example.ui.components.QiblaCompass3DIcon
+import com.example.ui.components.QuranBook3DIcon
 import com.example.ui.components.ServicesCommunityIcon
 import com.example.ui.components.SocialBadgesRow
+import com.example.ui.components.TasbeehBeads3DIcon
 import com.example.ui.components.VideosProgramsIcon
+import com.example.ui.components.ZiyaratDome3DIcon
 import com.example.ui.navigation.AlAnsariRoutes
+import com.example.ui.theme.CardSurfaceTop
+import com.example.ui.theme.CrimsonRed
+import com.example.ui.theme.CrimsonRedBright
+import com.example.ui.theme.CrimsonRedDark
+import com.example.ui.theme.ElevatedDark
+import com.example.ui.theme.EmeraldAccent
 import com.example.ui.theme.GoldBright
 import com.example.ui.theme.GoldGlow
 import com.example.ui.theme.GoldPrimary
+import com.example.ui.theme.GoldSpecular
 import com.example.ui.theme.ObsidianBlack
 import com.example.ui.theme.PureWhite
 
@@ -80,21 +97,21 @@ fun HomeScreen(
                 .widthIn(max = 600.dp)
                 .fillMaxWidth()
                 .verticalScroll(scrollState)
-                .padding(horizontal = 14.dp, vertical = 4.dp),
+                .padding(horizontal = 14.dp, vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // Top Hero Channel Logo synced from https://www.youtube.com/@alansarie1 with warm gold aura
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(152.dp),
+                    .height(148.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(124.dp),
+                        .height(120.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     Box(
@@ -114,11 +131,11 @@ fun HomeScreen(
                             error = painterResource(id = R.drawable.logo_al_ansari),
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .size(114.dp)
+                                .size(110.dp)
                                 .clip(CircleShape)
                                 .border(
                                     width = 2.5.dp,
-                                    brush = Brush.linearGradient(listOf(GoldBright, GoldPrimary)),
+                                    brush = Brush.linearGradient(listOf(GoldSpecular, GoldBright, GoldPrimary)),
                                     shape = CircleShape,
                                 )
                                 .testTag("home_youtube_logo"),
@@ -130,7 +147,7 @@ fun HomeScreen(
                             contentScale = ContentScale.Fit,
                             modifier = Modifier
                                 .fillMaxWidth(0.84f)
-                                .height(120.dp),
+                                .height(116.dp),
                         )
                     }
                 }
@@ -147,15 +164,15 @@ fun HomeScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            // Featured Full-Width Live Broadcast Card
+            // Featured Full-Width 3D Live Broadcast Card
             AlAnsariGoldCard(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { onNavigate(AlAnsariRoutes.LIVE) },
                 testTag = "home_card_live",
-                cornerRadius = 16.dp,
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                cornerRadius = 18.dp,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -180,7 +197,7 @@ fun HomeScreen(
                         CrimsonPillBadge(
                             text = stringResource(R.string.live_subtitle),
                             horizontalPadding = 16.dp,
-                            verticalPadding = 2.5.dp,
+                            verticalPadding = 3.dp,
                         )
                     }
                     Spacer(modifier = Modifier.width(12.dp))
@@ -195,8 +212,8 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { onNavigate(AlAnsariRoutes.BOOKING_REQUEST) },
                 testTag = "home_card_booking",
-                cornerRadius = 16.dp,
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                cornerRadius = 18.dp,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -222,36 +239,47 @@ fun HomeScreen(
                         CrimsonPillBadge(
                             text = stringResource(R.string.booking_subtitle),
                             horizontalPadding = 14.dp,
-                            verticalPadding = 2.5.dp,
+                            verticalPadding = 3.dp,
                         )
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Box(
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(50.dp)
                             .clip(CircleShape)
-                            .background(GoldBright.copy(alpha = 0.14f))
-                            .border(1.2.dp, GoldBright, CircleShape),
+                            .background(
+                                Brush.radialGradient(
+                                    listOf(ElevatedDark, CardSurfaceTop),
+                                ),
+                            )
+                            .border(1.4.dp, GoldBright, CircleShape),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Campaign,
                             contentDescription = stringResource(R.string.booking_title),
-                            tint = GoldBright,
+                            tint = GoldSpecular,
                             modifier = Modifier.size(28.dp),
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Row 1: Right = Field Coverage, Left = Videos & Programs
+            HomeSectionHeader(
+                title = "أقسام قناة الأنصاري",
+                badge = "بث وتغطيات",
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Channel Row 1
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                HomeGridCard(
+                AlAnsari3DTileCard(
                     title = stringResource(R.string.coverage_title),
                     subtitle = stringResource(R.string.coverage_subtitle),
                     testTag = "home_card_coverage",
@@ -259,7 +287,7 @@ fun HomeScreen(
                     modifier = Modifier.weight(1f),
                     icon = { FieldCoverageCameraIcon() },
                 )
-                HomeGridCard(
+                AlAnsari3DTileCard(
                     title = stringResource(R.string.videos_title),
                     subtitle = stringResource(R.string.videos_subtitle),
                     testTag = "home_card_videos",
@@ -271,12 +299,12 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Row 2: Right = News & Reports, Left = Events & Occasions
+            // Channel Row 2
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                HomeGridCard(
+                AlAnsari3DTileCard(
                     title = stringResource(R.string.news_title),
                     subtitle = stringResource(R.string.news_subtitle),
                     testTag = "home_card_news",
@@ -284,7 +312,7 @@ fun HomeScreen(
                     modifier = Modifier.weight(1f),
                     icon = { NewsNewspaperIcon() },
                 )
-                HomeGridCard(
+                AlAnsari3DTileCard(
                     title = stringResource(R.string.events_title),
                     subtitle = stringResource(R.string.events_subtitle),
                     testTag = "home_card_events",
@@ -296,27 +324,20 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Row 3: Right = Official Social Media, Left = All Channel Services
+            // Channel Row 3
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                HomeGridCard(
+                AlAnsari3DTileCard(
                     title = stringResource(R.string.social_title),
                     subtitle = stringResource(R.string.social_subtitle),
                     testTag = "home_card_social",
                     onClick = { onNavigate(AlAnsariRoutes.SOCIAL) },
                     modifier = Modifier.weight(1f),
-                    icon = {
-                        Box(
-                            modifier = Modifier.height(38.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            SocialBadgesRow()
-                        }
-                    },
+                    icon = { SocialBadgesRow() },
                 )
-                HomeGridCard(
+                AlAnsari3DTileCard(
                     title = stringResource(R.string.services_title),
                     subtitle = stringResource(R.string.services_subtitle),
                     testTag = "home_card_services",
@@ -326,54 +347,132 @@ fun HomeScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Haqeebat Al-Mu'min Full 3D Grid Section
+            HomeSectionHeader(
+                title = stringResource(R.string.haqeebat_section_title),
+                badge = "8 خدمات إيمانية",
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Haqeebat Row 1: القرآن الكريم + الأدعية
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                AlAnsari3DTileCard(
+                    title = stringResource(R.string.quran_title),
+                    subtitle = stringResource(R.string.quran_subtitle),
+                    testTag = "home_card_quran",
+                    onClick = { onNavigate(AlAnsariRoutes.QURAN) },
+                    modifier = Modifier.weight(1f),
+                    badgeColorTop = EmeraldAccent,
+                    badgeColorBottom = Color(0xFF10613B),
+                    icon = { QuranBook3DIcon() },
+                )
+                AlAnsari3DTileCard(
+                    title = stringResource(R.string.duas_title),
+                    subtitle = stringResource(R.string.duas_subtitle),
+                    testTag = "home_card_duas",
+                    onClick = { onNavigate(AlAnsariRoutes.DUAS) },
+                    modifier = Modifier.weight(1f),
+                    badgeColorTop = CrimsonRedBright,
+                    badgeColorBottom = CrimsonRedDark,
+                    icon = { DuaHands3DIcon() },
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Haqeebat Row 2: الزيارات + أوقات الصلاة
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                AlAnsari3DTileCard(
+                    title = stringResource(R.string.ziyarat_title),
+                    subtitle = stringResource(R.string.ziyarat_subtitle),
+                    testTag = "home_card_ziyarat",
+                    onClick = { onNavigate(AlAnsariRoutes.ZIYARAT) },
+                    modifier = Modifier.weight(1f),
+                    badgeColorTop = CrimsonRedBright,
+                    badgeColorBottom = CrimsonRedDark,
+                    icon = { ZiyaratDome3DIcon() },
+                )
+                AlAnsari3DTileCard(
+                    title = stringResource(R.string.prayer_times_title),
+                    subtitle = stringResource(R.string.prayer_times_subtitle),
+                    testTag = "home_card_prayer_times",
+                    onClick = { onNavigate(AlAnsariRoutes.PRAYER_TIMES) },
+                    modifier = Modifier.weight(1f),
+                    badgeColorTop = EmeraldAccent,
+                    badgeColorBottom = Color(0xFF10613B),
+                    icon = { PrayerTimesCrescent3DIcon() },
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Haqeebat Row 3: اتجاه القبلة + المسبحة
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                AlAnsari3DTileCard(
+                    title = stringResource(R.string.qibla_title),
+                    subtitle = stringResource(R.string.qibla_subtitle),
+                    testTag = "home_card_qibla",
+                    onClick = { onNavigate(AlAnsariRoutes.QIBLA) },
+                    modifier = Modifier.weight(1f),
+                    badgeColorTop = CrimsonRed,
+                    badgeColorBottom = CrimsonRedDark,
+                    icon = { QiblaCompass3DIcon() },
+                )
+                AlAnsari3DTileCard(
+                    title = stringResource(R.string.tasbeeh_title),
+                    subtitle = stringResource(R.string.tasbeeh_subtitle),
+                    testTag = "home_card_tasbeeh",
+                    onClick = { onNavigate(AlAnsariRoutes.TASBEEH) },
+                    modifier = Modifier.weight(1f),
+                    badgeColorTop = EmeraldAccent,
+                    badgeColorBottom = Color(0xFF10613B),
+                    icon = { TasbeehBeads3DIcon() },
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Haqeebat Row 4: التقويم الهجري + الاستخارة والمسائل
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                AlAnsari3DTileCard(
+                    title = stringResource(R.string.hijri_title),
+                    subtitle = stringResource(R.string.hijri_subtitle),
+                    testTag = "home_card_hijri_calendar",
+                    onClick = { onNavigate(AlAnsariRoutes.HIJRI_CALENDAR) },
+                    modifier = Modifier.weight(1f),
+                    badgeColorTop = CrimsonRedBright,
+                    badgeColorBottom = CrimsonRedDark,
+                    icon = { HijriCrescentCalendar3DIcon() },
+                )
+                AlAnsari3DTileCard(
+                    title = stringResource(R.string.istikhara_title),
+                    subtitle = stringResource(R.string.istikhara_subtitle),
+                    testTag = "home_card_istikhara",
+                    onClick = { onNavigate(AlAnsariRoutes.ISTIKHARA_FIQH) },
+                    modifier = Modifier.weight(1f),
+                    badgeColorTop = EmeraldAccent,
+                    badgeColorBottom = Color(0xFF10613B),
+                    icon = { IstikharaQuranStar3DIcon() },
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
         }
     }
 }
 
-@Composable
-private fun HomeGridCard(
-    title: String,
-    subtitle: String,
-    testTag: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    icon: @Composable () -> Unit,
-) {
-    AlAnsariGoldCard(
-        modifier = modifier.height(108.dp),
-        onClick = onClick,
-        testTag = testTag,
-        cornerRadius = 16.dp,
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Box(
-                modifier = Modifier.height(38.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                icon()
-            }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = PureWhite,
-                ),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-            )
-            CrimsonPillBadge(
-                text = subtitle,
-                horizontalPadding = 12.dp,
-                verticalPadding = 2.dp,
-            )
-        }
-    }
-}

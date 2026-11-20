@@ -21,4 +21,22 @@
     <string name="social_subtitle">الرسمية</string>
     <string name="booking_title">طلب حجز تغطية وبث مباشر</string>
     <string name="booking_subtitle">احجز وحدة SNG1080 الآن</string>
+
+    <string name="haqeebat_section_title">حقيبة المؤمن المتكاملة</string>
+    <string name="quran_title">القرآن الكريم</string>
+    <string name="quran_subtitle">114 سورة • ختمة</string>
+    <string name="duas_title">الأدعية</string>
+    <string name="duas_subtitle">والمناجاة</string>
+    <string name="ziyarat_title">الزيارات</string>
+    <string name="ziyarat_subtitle">للعتبات المقدسة</string>
+    <string name="prayer_times_title">أوقات الصلاة</string>
+    <string name="prayer_times_subtitle">الأذان والإمساك</string>
+    <string name="qibla_title">اتجاه القبلة</string>
+    <string name="qibla_subtitle">بوصلة مباشرة</string>
+    <string name="tasbeeh_title">المسبحة</string>
+    <string name="tasbeeh_subtitle">تسبيح الزهراء (ع)</string>
+    <string name="hijri_title">التقويم الهجري</string>
+    <string name="hijri_subtitle">ومناسبات أهل البيت</string>
+    <string name="istikhara_title">الاستخارة</string>
+    <string name="istikhara_subtitle">والمسائل الشرعية</string>
 </resources>

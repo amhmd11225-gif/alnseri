@@ -14,6 +14,16 @@ object AlAnsariRoutes {
     const val VIDEO_PLAYER = "video_player/{videoId}"
     const val NEWS_DETAIL = "news_detail/{newsId}"
 
+    // Haqeebat Al-Mu'min routes
+    const val QURAN = "quran"
+    const val DUAS = "duas"
+    const val ZIYARAT = "ziyarat"
+    const val PRAYER_TIMES = "prayer_times"
+    const val QIBLA = "qibla"
+    const val TASBEEH = "tasbeeh"
+    const val HIJRI_CALENDAR = "hijri_calendar"
+    const val ISTIKHARA_FIQH = "istikhara_fiqh"
+
     fun videoPlayer(videoId: String): String = "video_player/$videoId"
     fun newsDetail(newsId: String): String = "news_detail/$newsId"
 }

@@ -53,6 +53,14 @@ import com.example.ui.screens.NewsScreen
 import com.example.ui.screens.SocialLinksScreen
 import com.example.ui.screens.VideoPlayerScreen
 import com.example.ui.screens.VideosScreen
+import com.example.ui.screens.haqeebat.DuasScreen
+import com.example.ui.screens.haqeebat.HijriCalendarScreen
+import com.example.ui.screens.haqeebat.IstikharaFiqhScreen
+import com.example.ui.screens.haqeebat.PrayerTimesScreen
+import com.example.ui.screens.haqeebat.QiblaScreen
+import com.example.ui.screens.haqeebat.QuranScreen
+import com.example.ui.screens.haqeebat.TasbeehScreen
+import com.example.ui.screens.haqeebat.ZiyaratScreen
 import com.example.ui.theme.AlAnsariTheme
 import com.example.ui.theme.CardSurfaceTop
 import com.example.ui.theme.GoldBright
@@ -301,6 +309,75 @@ fun AlAnsariApp() {
                         onRefreshYouTube = { viewModel.refreshFromYouTube(showToast = true) },
                         onSyncCms = viewModel::syncFromCmsDashboard,
                         onShowMessage = viewModel::showStatusMessage,
+                        onBackClick = { navController.popBackStack() },
+                    )
+                }
+
+                composable(AlAnsariRoutes.QURAN) {
+                    QuranScreen(
+                        bookmarkedSurahNumber = uiState.haqeebat.quranBookmarkSurah,
+                        onBookmarkSurah = viewModel::setQuranBookmark,
+                        onShowMessage = viewModel::showStatusMessage,
+                        onBackClick = { navController.popBackStack() },
+                    )
+                }
+
+                composable(AlAnsariRoutes.DUAS) {
+                    DuasScreen(
+                        favoriteIds = uiState.haqeebat.favoritePrayerIds,
+                        onToggleFavorite = viewModel::toggleFavoritePrayer,
+                        onShowMessage = viewModel::showStatusMessage,
+                        onBackClick = { navController.popBackStack() },
+                    )
+                }
+
+                composable(AlAnsariRoutes.ZIYARAT) {
+                    ZiyaratScreen(
+                        favoriteIds = uiState.haqeebat.favoritePrayerIds,
+                        onToggleFavorite = viewModel::toggleFavoritePrayer,
+                        onShowMessage = viewModel::showStatusMessage,
+                        onBackClick = { navController.popBackStack() },
+                    )
+                }
+
+                composable(AlAnsariRoutes.PRAYER_TIMES) {
+                    PrayerTimesScreen(
+                        selectedCityId = uiState.haqeebat.selectedCityId,
+                        hijriOffsetDays = uiState.haqeebat.hijriOffsetDays,
+                        onSelectCity = viewModel::selectHaqeebatCity,
+                        onBackClick = { navController.popBackStack() },
+                    )
+                }
+
+                composable(AlAnsariRoutes.QIBLA) {
+                    QiblaScreen(
+                        selectedCityId = uiState.haqeebat.selectedCityId,
+                        onSelectCity = viewModel::selectHaqeebatCity,
+                        onBackClick = { navController.popBackStack() },
+                    )
+                }
+
+                composable(AlAnsariRoutes.TASBEEH) {
+                    TasbeehScreen(
+                        totalLifetimeCount = uiState.haqeebat.tasbeehTotal,
+                        onIncrementTotal = viewModel::incrementTasbeeh,
+                        onResetTotal = viewModel::resetTasbeeh,
+                        onBackClick = { navController.popBackStack() },
+                    )
+                }
+
+                composable(AlAnsariRoutes.HIJRI_CALENDAR) {
+                    HijriCalendarScreen(
+                        hijriOffsetDays = uiState.haqeebat.hijriOffsetDays,
+                        onAdjustOffset = { delta ->
+                            viewModel.adjustHijriOffset(delta, uiState.haqeebat.hijriOffsetDays)
+                        },
+                        onBackClick = { navController.popBackStack() },
+                    )
+                }
+
+                composable(AlAnsariRoutes.ISTIKHARA_FIQH) {
+                    IstikharaFiqhScreen(
                         onBackClick = { navController.popBackStack() },
                     )
                 }

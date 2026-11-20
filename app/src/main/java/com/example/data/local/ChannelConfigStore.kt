@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -19,8 +20,6 @@ class ChannelConfigStore(private val context: Context) {
         const val DEFAULT_YOUTUBE_CHANNEL_ID = "UCbZnqtO8B64mMhTzTXIxqUA"
         const val DEFAULT_YOUTUBE_HANDLE = "@alansarie1"
 
-        // Open public test HLS stream clearly labeled as technical player preview
-        // until the channel admin sets the official .m3u8 URL.
         const val OPEN_HLS_TEST_STREAM =
             "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_fmp4/master.m3u8"
         const val OPEN_VOD_TEST_STREAM =
@@ -49,6 +48,13 @@ class ChannelConfigStore(private val context: Context) {
         private val KEY_BOOKMARKED_NEWS = stringSetPreferencesKey("bookmarked_news")
         private val KEY_CUSTOM_VIDEO_OVERRIDES = stringSetPreferencesKey("custom_video_urls")
         private val KEY_SAVED_REQUESTS = stringSetPreferencesKey("saved_coverage_requests")
+
+        // Haqeebat Al-Mu'min local preferences
+        private val KEY_TASBEEH_TOTAL = intPreferencesKey("haqeebat_tasbeeh_total")
+        private val KEY_SELECTED_CITY_ID = stringPreferencesKey("haqeebat_selected_city_id")
+        private val KEY_QURAN_BOOKMARK_SURAH = intPreferencesKey("haqeebat_quran_bookmark_surah")
+        private val KEY_HIJRI_OFFSET = intPreferencesKey("haqeebat_hijri_offset")
+        private val KEY_FAVORITE_PRAYERS = stringSetPreferencesKey("haqeebat_favorite_prayers")
     }
 
     val settingsFlow: Flow<ChannelSettings> = context.channelDataStore.data.map { prefs ->
@@ -85,6 +91,65 @@ class ChannelConfigStore(private val context: Context) {
 
     val savedRequestsFlow: Flow<List<String>> = context.channelDataStore.data.map { prefs ->
         (prefs[KEY_SAVED_REQUESTS] ?: emptySet()).toList().sortedDescending()
+    }
+
+    val tasbeehTotalFlow: Flow<Int> = context.channelDataStore.data.map { prefs ->
+        prefs[KEY_TASBEEH_TOTAL] ?: 0
+    }
+
+    val selectedCityIdFlow: Flow<String> = context.channelDataStore.data.map { prefs ->
+        prefs[KEY_SELECTED_CITY_ID] ?: "najaf"
+    }
+
+    val quranBookmarkSurahFlow: Flow<Int> = context.channelDataStore.data.map { prefs ->
+        prefs[KEY_QURAN_BOOKMARK_SURAH] ?: 1
+    }
+
+    val hijriOffsetFlow: Flow<Int> = context.channelDataStore.data.map { prefs ->
+        prefs[KEY_HIJRI_OFFSET] ?: 0
+    }
+
+    val favoritePrayersFlow: Flow<Set<String>> = context.channelDataStore.data.map { prefs ->
+        prefs[KEY_FAVORITE_PRAYERS] ?: emptySet()
+    }
+
+    suspend fun incrementTasbeehTotal(delta: Int = 1) {
+        context.channelDataStore.edit { prefs ->
+            val current = prefs[KEY_TASBEEH_TOTAL] ?: 0
+            prefs[KEY_TASBEEH_TOTAL] = (current + delta).coerceAtLeast(0)
+        }
+    }
+
+    suspend fun resetTasbeehTotal() {
+        context.channelDataStore.edit { prefs ->
+            prefs[KEY_TASBEEH_TOTAL] = 0
+        }
+    }
+
+    suspend fun setSelectedCityId(cityId: String) {
+        context.channelDataStore.edit { prefs ->
+            prefs[KEY_SELECTED_CITY_ID] = cityId
+        }
+    }
+
+    suspend fun setQuranBookmarkSurah(surahNumber: Int) {
+        context.channelDataStore.edit { prefs ->
+            prefs[KEY_QURAN_BOOKMARK_SURAH] = surahNumber
+        }
+    }
+
+    suspend fun setHijriOffset(offset: Int) {
+        context.channelDataStore.edit { prefs ->
+            prefs[KEY_HIJRI_OFFSET] = offset.coerceIn(-2, 2)
+        }
+    }
+
+    suspend fun toggleFavoritePrayer(id: String) {
+        context.channelDataStore.edit { prefs ->
+            val current = (prefs[KEY_FAVORITE_PRAYERS] ?: emptySet()).toMutableSet()
+            if (current.contains(id)) current.remove(id) else current.add(id)
+            prefs[KEY_FAVORITE_PRAYERS] = current
+        }
     }
 
     suspend fun updateLiveUrls(primaryUrl: String, backupUrl: String) {

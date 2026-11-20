@@ -3,11 +3,14 @@ package com.example.ui.screens
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,26 +26,36 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.data.remote.YouTubeStreamResolver
 import com.example.ui.components.AlAnsariGoldCard
 import com.example.ui.components.AlAnsariMediaPlayer
 import com.example.ui.components.AlAnsariSubTopBar
 import com.example.ui.components.AlAnsariYouTubePlayer
 import com.example.ui.components.CrimsonPillBadge
 import com.example.ui.theme.GoldBright
+import com.example.ui.theme.GoldPrimary
 import com.example.ui.theme.ObsidianBlack
 import com.example.ui.theme.PureWhite
 import com.example.ui.viewmodel.AlAnsariUiState
@@ -114,6 +127,23 @@ fun VideoPlayerScreen(
             }
             val watchUrl = video.youtubeWatchUrl ?: uiState.settings.youtubeUrl
 
+            var resolvedDirectUrl by remember(video.id) { mutableStateOf<String?>(null) }
+            var isResolvingDirectStream by remember(video.id) {
+                mutableStateOf(video.videoUrl.isBlank() && !resolvedYtId.isNullOrBlank())
+            }
+            var exoFallbackTriggered by remember(video.id) { mutableStateOf(false) }
+
+            LaunchedEffect(video.id, resolvedYtId) {
+                if (video.videoUrl.isBlank() && !resolvedYtId.isNullOrBlank()) {
+                    isResolvingDirectStream = true
+                    exoFallbackTriggered = false
+                    resolvedDirectUrl = YouTubeStreamResolver.resolveDirectStreamUrl(resolvedYtId)
+                    isResolvingDirectStream = false
+                } else {
+                    isResolvingDirectStream = false
+                }
+            }
+
             LazyColumn(
                 modifier = Modifier
                     .widthIn(max = 680.dp)
@@ -123,18 +153,54 @@ fun VideoPlayerScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
-                    if (video.videoUrl.isNotBlank()) {
-                        AlAnsariMediaPlayer(
-                            streamUrl = video.videoUrl,
-                            title = video.title,
-                            isLiveStream = false,
-                        )
-                    } else {
-                        AlAnsariYouTubePlayer(
-                            videoId = resolvedYtId,
-                            fallbackWebUrl = watchUrl,
-                            title = video.title,
-                        )
+                    when {
+                        video.videoUrl.isNotBlank() -> {
+                            AlAnsariMediaPlayer(
+                                streamUrl = video.videoUrl,
+                                title = video.title,
+                                isLiveStream = false,
+                            )
+                        }
+
+                        isResolvingDirectStream -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(16f / 9f)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(Color.Black)
+                                    .border(1.2.dp, GoldPrimary, RoundedCornerShape(16.dp))
+                                    .testTag("youtube_inapp_player"),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    CircularProgressIndicator(color = GoldBright, strokeWidth = 3.dp)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "جاري تجهيز التشغيل المباشر...",
+                                        style = MaterialTheme.typography.labelMedium.copy(color = GoldBright),
+                                    )
+                                }
+                            }
+                        }
+
+                        !resolvedDirectUrl.isNullOrBlank() && !exoFallbackTriggered -> {
+                            AlAnsariMediaPlayer(
+                                streamUrl = resolvedDirectUrl.orEmpty(),
+                                title = video.title,
+                                isLiveStream = false,
+                                onPlaybackError = { exoFallbackTriggered = true },
+                                modifier = Modifier.testTag("youtube_inapp_player"),
+                            )
+                        }
+
+                        else -> {
+                            AlAnsariYouTubePlayer(
+                                videoId = resolvedYtId,
+                                fallbackWebUrl = watchUrl,
+                                title = video.title,
+                            )
+                        }
                     }
                 }
 

@@ -37,6 +37,14 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+data class HaqeebatPrefsState(
+    val tasbeehTotal: Int = 0,
+    val selectedCityId: String = "najaf",
+    val quranBookmarkSurah: Int = 1,
+    val hijriOffsetDays: Int = 0,
+    val favoritePrayerIds: Set<String> = emptySet(),
+)
+
 data class AlAnsariUiState(
     val settings: ChannelSettings = ChannelSettings(
         primaryLiveUrl = "",
@@ -74,6 +82,7 @@ data class AlAnsariUiState(
     val bookmarkedVideoIds: Set<String> = emptySet(),
     val bookmarkedNewsIds: Set<String> = emptySet(),
     val savedRequests: List<String> = emptyList(),
+    val haqeebat: HaqeebatPrefsState = HaqeebatPrefsState(),
     val statusMessage: String? = null,
     val isSyncingCms: Boolean = false,
 )
@@ -203,12 +212,29 @@ class AlAnsariViewModel(
         )
     }
 
+    private val haqeebatPrefsFlow = combine(
+        configStore.tasbeehTotalFlow,
+        configStore.selectedCityIdFlow,
+        configStore.quranBookmarkSurahFlow,
+        configStore.hijriOffsetFlow,
+        configStore.favoritePrayersFlow,
+    ) { tasbeehTotal, cityId, bookmarkSurah, hijriOffset, favorites ->
+        HaqeebatPrefsState(
+            tasbeehTotal = tasbeehTotal,
+            selectedCityId = cityId,
+            quranBookmarkSurah = bookmarkSurah,
+            hijriOffsetDays = hijriOffset,
+            favoritePrayerIds = favorites,
+        )
+    }
+
     val uiState: StateFlow<AlAnsariUiState> = combine(
         repository.settingsFlow,
         cloudConfigFlow,
         repository.savedRequestsFlow,
         auxiliaryFlow,
-    ) { localSettings, cloudConfig, savedRequests, aux ->
+        haqeebatPrefsFlow,
+    ) { localSettings, cloudConfig, savedRequests, aux, haqeebatState ->
         val effectiveSettings = if (cloudConfig != null) {
             localSettings.copy(
                 primaryLiveUrl = cloudConfig.primaryLiveUrl,
@@ -304,6 +330,7 @@ class AlAnsariViewModel(
             bookmarkedVideoIds = aux.bookmarkedVideos,
             bookmarkedNewsIds = aux.bookmarkedNews,
             savedRequests = savedRequests,
+            haqeebat = haqeebatState,
             statusMessage = aux.statusMessage,
             isSyncingCms = aux.isSyncing,
         )
@@ -494,6 +521,44 @@ class AlAnsariViewModel(
     fun toggleNewsBookmark(newsId: String) {
         viewModelScope.launch {
             configStore.toggleNewsBookmark(newsId)
+        }
+    }
+
+    fun incrementTasbeeh(delta: Int = 1) {
+        viewModelScope.launch {
+            configStore.incrementTasbeehTotal(delta)
+        }
+    }
+
+    fun resetTasbeeh() {
+        viewModelScope.launch {
+            configStore.resetTasbeehTotal()
+            statusMessageFlow.value = "تم تصفير عدّاد التسبيح الإجمالي"
+        }
+    }
+
+    fun selectHaqeebatCity(cityId: String) {
+        viewModelScope.launch {
+            configStore.setSelectedCityId(cityId)
+        }
+    }
+
+    fun setQuranBookmark(surahNumber: Int) {
+        viewModelScope.launch {
+            configStore.setQuranBookmarkSurah(surahNumber)
+            statusMessageFlow.value = "تم تثبيت علامة الختمة عند سورة رقم $surahNumber"
+        }
+    }
+
+    fun adjustHijriOffset(delta: Int, currentOffset: Int) {
+        viewModelScope.launch {
+            configStore.setHijriOffset((currentOffset + delta).coerceIn(-2, 2))
+        }
+    }
+
+    fun toggleFavoritePrayer(id: String) {
+        viewModelScope.launch {
+            configStore.toggleFavoritePrayer(id)
         }
     }
 

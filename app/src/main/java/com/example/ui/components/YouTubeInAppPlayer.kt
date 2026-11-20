@@ -2,12 +2,15 @@ package com.example.ui.components
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.graphics.Color as AndroidColor
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -32,11 +35,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -53,6 +60,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -78,9 +86,10 @@ fun AlAnsariYouTubePlayer(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
+    val appReferer = remember(context) { "https://${context.packageName}/" }
 
     var isLoading by remember(videoId, fallbackWebUrl) { mutableStateOf(true) }
-    var useMobileWebFallback by remember(videoId) { mutableStateOf(videoId.isNullOrBlank()) }
+    var embedBlockedOrLoginNeeded by remember(videoId) { mutableStateOf(false) }
     var reloadNonce by remember { mutableIntStateOf(0) }
     var fullscreenView by remember { mutableStateOf<View?>(null) }
     var fullscreenCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
@@ -94,6 +103,11 @@ fun AlAnsariYouTubePlayer(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT,
                 )
+                runCatching {
+                    val cookieManager = CookieManager.getInstance()
+                    cookieManager.setAcceptCookie(true)
+                    cookieManager.setAcceptThirdPartyCookies(this, true)
+                }
                 settings.apply {
                     javaScriptEnabled = true
                     domStorageEnabled = true
@@ -122,18 +136,10 @@ fun AlAnsariYouTubePlayer(
         if (webViewHolder != null) {
             val bridge = object {
                 @JavascriptInterface
-                fun onPlayerReady() {
-                    mainHandler.post { isLoading = false }
-                }
-
-                @JavascriptInterface
-                fun onPlayerError(code: Int) {
+                fun onEmbedIssue() {
                     mainHandler.post {
-                        if (!useMobileWebFallback && !videoId.isNullOrBlank()) {
-                            useMobileWebFallback = true
-                        } else {
-                            isLoading = false
-                        }
+                        isLoading = false
+                        embedBlockedOrLoginNeeded = true
                     }
                 }
             }
@@ -144,23 +150,53 @@ fun AlAnsariYouTubePlayer(
                     request: WebResourceRequest?,
                 ): Boolean {
                     val uri = request?.url ?: return false
+                    val urlString = uri.toString()
                     val scheme = uri.scheme?.lowercase().orEmpty()
                     val host = uri.host?.lowercase().orEmpty()
+
+                    // Never navigate the embedded player to YouTube's Google Sign-In page
+                    if (host.contains("accounts.google.") ||
+                        urlString.contains("ServiceLogin", ignoreCase = true) ||
+                        urlString.contains("signin", ignoreCase = true)
+                    ) {
+                        mainHandler.post {
+                            embedBlockedOrLoginNeeded = true
+                            isLoading = false
+                        }
+                        return true
+                    }
+
                     if (scheme != "http" && scheme != "https") {
                         return true
                     }
-                    val isAllowedYouTubeHost = host.contains("youtube.com") ||
-                        host.contains("youtu.be") ||
-                        host.contains("youtube-nocookie.com") ||
+
+                    val isEmbedMediaHost = host.contains("youtube-nocookie.com") ||
+                        host.contains("youtube.com") ||
                         host.contains("googlevideo.com") ||
-                        host.contains("ytimg.com") ||
-                        host.contains("google.com")
-                    return !isAllowedYouTubeHost
+                        host.contains("ytimg.com")
+                    return !isEmbedMediaHost
                 }
 
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
                     isLoading = false
+                    // Detect YouTube's bot/sign-in interstitial inside the embed DOM without showing a login screen
+                    view?.evaluateJavascript(
+                        """
+                        (function() {
+                          try {
+                            var bodyText = (document.body && document.body.innerText) ? document.body.innerText : '';
+                            if (bodyText.indexOf('Sign in to confirm') !== -1 ||
+                                bodyText.indexOf('تسجيل الدخول لتأكيد') !== -1 ||
+                                bodyText.indexOf('Error 153') !== -1 ||
+                                bodyText.indexOf('Video unavailable') !== -1) {
+                              if (window.AndroidYtBridge) AndroidYtBridge.onEmbedIssue();
+                            }
+                          } catch(e) {}
+                        })();
+                        """.trimIndent(),
+                        null,
+                    )
                 }
             }
             webViewHolder.webChromeClient = object : WebChromeClient() {
@@ -196,13 +232,8 @@ fun AlAnsariYouTubePlayer(
     DisposableEffect(lifecycleOwner, webViewHolder) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_PAUSE -> runCatching {
-                    webViewHolder?.evaluateJavascript("if (window.ytPlayer && ytPlayer.pauseVideo) { ytPlayer.pauseVideo(); }", null)
-                    webViewHolder?.onPause()
-                }
-                Lifecycle.Event.ON_RESUME -> runCatching {
-                    webViewHolder?.onResume()
-                }
+                Lifecycle.Event.ON_PAUSE -> runCatching { webViewHolder?.onPause() }
+                Lifecycle.Event.ON_RESUME -> runCatching { webViewHolder?.onResume() }
                 else -> Unit
             }
         }
@@ -212,27 +243,18 @@ fun AlAnsariYouTubePlayer(
         }
     }
 
-    LaunchedEffect(webViewHolder, videoId, fallbackWebUrl, useMobileWebFallback, reloadNonce) {
+    LaunchedEffect(webViewHolder, videoId, fallbackWebUrl, reloadNonce) {
         val wv = webViewHolder ?: return@LaunchedEffect
-        isLoading = true
-        val cleanId = videoId?.trim().orEmpty()
-        if (cleanId.isNotBlank() && !useMobileWebFallback) {
-            val html = buildYouTubeIframeHtml(cleanId)
-            wv.loadDataWithBaseURL(
-                "https://www.youtube.com/",
-                html,
-                "text/html",
-                "UTF-8",
-                "https://www.youtube.com/",
-            )
-        } else {
-            val targetUrl = if (cleanId.isNotBlank()) {
-                "https://m.youtube.com/watch?v=$cleanId"
-            } else {
-                fallbackWebUrl.ifBlank { "https://m.youtube.com/@alansarie1" }
-            }
-            wv.loadUrl(targetUrl, mapOf("Referer" to "https://www.youtube.com/"))
+        val cleanId = videoId?.trim()?.replace(Regex("[^a-zA-Z0-9_-]"), "").orEmpty()
+        if (cleanId.isBlank()) {
+            isLoading = false
+            embedBlockedOrLoginNeeded = true
+            return@LaunchedEffect
         }
+        embedBlockedOrLoginNeeded = false
+        isLoading = true
+        val embedUrl = "https://www.youtube-nocookie.com/embed/$cleanId?autoplay=1&playsinline=1&rel=0&modestbranding=1&fs=1&hl=ar"
+        wv.loadUrl(embedUrl, mapOf("Referer" to appReferer))
     }
 
     if (fullscreenView != null) {
@@ -284,7 +306,7 @@ fun AlAnsariYouTubePlayer(
                 .background(Color.Black)
                 .border(1.2.dp, GoldPrimary, RoundedCornerShape(16.dp)),
         ) {
-            if (webViewHolder != null && fullscreenView == null) {
+            if (webViewHolder != null && fullscreenView == null && !embedBlockedOrLoginNeeded) {
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
                     factory = {
@@ -294,7 +316,56 @@ fun AlAnsariYouTubePlayer(
                 )
             }
 
-            if (isLoading) {
+            if (embedBlockedOrLoginNeeded) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.92f))
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Text(
+                        text = "تعذر تشغيل هذا المقطع بالتضمين المباشر على الشبكة الحالية بدون حساب.",
+                        style = MaterialTheme.typography.bodyMedium.copy(color = PureWhite),
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = {
+                                embedBlockedOrLoginNeeded = false
+                                reloadNonce++
+                            },
+                            shape = RoundedCornerShape(50),
+                        ) {
+                            Icon(Icons.Filled.Refresh, contentDescription = null, tint = GoldBright, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("إعادة المحاولة", color = GoldBright)
+                        }
+                        Button(
+                            onClick = {
+                                val target = if (!videoId.isNullOrBlank()) {
+                                    "https://www.youtube.com/watch?v=$videoId"
+                                } else {
+                                    fallbackWebUrl
+                                }
+                                runCatching {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target)))
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed, contentColor = PureWhite),
+                            shape = RoundedCornerShape(50),
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("تطبيق يوتيوب", style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
+                }
+            }
+
+            if (isLoading && !embedBlockedOrLoginNeeded) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -305,7 +376,7 @@ fun AlAnsariYouTubePlayer(
                         CircularProgressIndicator(color = GoldBright, strokeWidth = 3.dp)
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "جاري تشغيل الفيديو داخل التطبيق...",
+                            text = "جاري تحميل المشغّل...",
                             style = MaterialTheme.typography.labelMedium.copy(color = GoldBright),
                         )
                     }
@@ -328,7 +399,7 @@ fun AlAnsariYouTubePlayer(
                 modifier = Modifier.weight(1f),
             ) {
                 CrimsonPillBadge(
-                    text = if (useMobileWebFallback) "مشغل يوتيوب المباشر" else "تشغيل داخلي",
+                    text = "مشغّل مباشر",
                     horizontalPadding = 10.dp,
                     verticalPadding = 2.dp,
                 )
@@ -345,7 +416,7 @@ fun AlAnsariYouTubePlayer(
             }
             IconButton(
                 onClick = {
-                    useMobileWebFallback = videoId.isNullOrBlank()
+                    embedBlockedOrLoginNeeded = false
                     reloadNonce++
                 },
                 modifier = Modifier
@@ -361,75 +432,4 @@ fun AlAnsariYouTubePlayer(
             }
         }
     }
-}
-
-private fun buildYouTubeIframeHtml(rawVideoId: String): String {
-    val safeId = rawVideoId.replace(Regex("[^a-zA-Z0-9_-]"), "")
-    return """
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8" />
-          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-          <meta name="referrer" content="strict-origin-when-cross-origin" />
-          <style>
-            html, body {
-              margin: 0;
-              padding: 0;
-              width: 100%;
-              height: 100%;
-              background-color: #000000;
-              overflow: hidden;
-            }
-            #player {
-              position: fixed;
-              inset: 0;
-              width: 100%;
-              height: 100%;
-              border: 0;
-            }
-          </style>
-        </head>
-        <body>
-          <div id="player"></div>
-          <script>
-            var tag = document.createElement('script');
-            tag.src = 'https://www.youtube.com/iframe_api';
-            tag.onerror = function() {
-              if (window.AndroidYtBridge) { AndroidYtBridge.onPlayerError(-1); }
-            };
-            var firstScriptTag = document.getElementsByTagName('script')[0];
-            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-
-            var ytPlayer;
-            function onYouTubeIframeAPIReady() {
-              ytPlayer = new YT.Player('player', {
-                width: '100%',
-                height: '100%',
-                videoId: '$safeId',
-                playerVars: {
-                  autoplay: 1,
-                  playsinline: 1,
-                  controls: 1,
-                  fs: 1,
-                  rel: 0,
-                  modestbranding: 1,
-                  enablejsapi: 1,
-                  origin: 'https://www.youtube.com'
-                },
-                events: {
-                  onReady: function(event) {
-                    if (window.AndroidYtBridge) { AndroidYtBridge.onPlayerReady(); }
-                    try { event.target.playVideo(); } catch (e) {}
-                  },
-                  onError: function(event) {
-                    if (window.AndroidYtBridge) { AndroidYtBridge.onPlayerError(event.data || 150); }
-                  }
-                }
-              });
-            }
-          </script>
-        </body>
-        </html>
-    """.trimIndent()
 }

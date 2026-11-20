@@ -103,6 +103,7 @@ fun AlAnsariMediaPlayer(
     title: String,
     isLiveStream: Boolean,
     modifier: Modifier = Modifier,
+    onPlaybackError: (() -> Unit)? = null,
 ) {
     val protocol = remember(streamUrl) { detectStreamProtocol(streamUrl) }
     val useLibVlcEngine = protocol == StreamProtocol.SRT ||
@@ -123,6 +124,7 @@ fun AlAnsariMediaPlayer(
             title = title,
             protocol = protocol,
             isLiveStream = isLiveStream,
+            onPlaybackError = onPlaybackError,
             modifier = modifier,
         )
     }
@@ -135,6 +137,7 @@ private fun ExoMediaPlayerView(
     title: String,
     protocol: StreamProtocol,
     isLiveStream: Boolean,
+    onPlaybackError: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -190,6 +193,7 @@ private fun ExoMediaPlayerView(
             override fun onPlayerError(error: PlaybackException) {
                 isBuffering = false
                 errorMessage = "تعذر تشغيل البث (${error.errorCodeName}). تحقق من الاتصال بالإنترنت."
+                onPlaybackError?.invoke()
             }
         }
         exoPlayer.addListener(listener)
