@@ -8,7 +8,6 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
-import com.example.R
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -45,6 +44,18 @@ object GoogleAuthHelper {
         awaitClose { removeAuthStateListener(listener) }
     }
 
+    private fun resolveWebClientId(context: Context): String? {
+        val resId = context.resources.getIdentifier(
+            "default_web_client_id",
+            "string",
+            context.packageName,
+        )
+        if (resId == 0) return null
+        return runCatching { context.getString(resId).trim() }
+            .getOrNull()
+            ?.takeIf { it.isNotEmpty() }
+    }
+
     fun attemptAutoSignIn(
         context: Context,
         credentialManager: CredentialManager,
@@ -56,9 +67,8 @@ object GoogleAuthHelper {
             onAuthSuccess()
             return
         }
-        val clientId = try {
-            context.getString(R.string.default_web_client_id)
-        } catch (_: Exception) {
+        val clientId = resolveWebClientId(context)
+        if (clientId == null) {
             onUnauthenticated()
             return
         }
@@ -95,10 +105,9 @@ object GoogleAuthHelper {
         onAuthError: (String) -> Unit,
         onAuthCancelled: () -> Unit = {},
     ) {
-        val clientId = try {
-            context.getString(R.string.default_web_client_id)
-        } catch (_: Exception) {
-            onAuthError("إعدادات تسجيل دخول Google غير مكتملة")
+        val clientId = resolveWebClientId(context)
+        if (clientId == null) {
+            onAuthError("إعدادات تسجيل دخول Google غير مكتملة (أضف google-services.json)")
             return
         }
         val activity = context as? Activity
