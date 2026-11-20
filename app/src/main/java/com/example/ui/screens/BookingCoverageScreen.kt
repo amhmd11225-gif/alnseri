@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
@@ -21,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.CheckCircle
@@ -55,12 +57,53 @@ import com.example.ui.components.AlAnsariSubTopBar
 import com.example.ui.components.CrimsonPillBadge
 import com.example.ui.components.GoldOutlineChip
 import com.example.ui.theme.CrimsonRed
+import com.example.ui.theme.EmeraldAccent
 import com.example.ui.theme.GoldBright
 import com.example.ui.theme.GoldDarkBorder
 import com.example.ui.theme.MutedGray
 import com.example.ui.theme.ObsidianBlack
 import com.example.ui.theme.PureWhite
 import com.example.ui.viewmodel.AlAnsariUiState
+
+const val BOOKING_WHATSAPP_NUMBER = "9647801705580"
+
+fun buildBookingWhatsAppUrl(
+    serviceType: String,
+    senderName: String,
+    phone: String,
+    governorate: String,
+    eventDate: String,
+    topic: String,
+    details: String,
+    whatsAppDigits: String = BOOKING_WHATSAPP_NUMBER,
+): String {
+    val body = buildString {
+        appendLine("السلام عليكم، أود طلب حجز تغطية وبث مباشر – قناة الأنصاري (SNG1080):")
+        appendLine("• نوع الخدمة: ${serviceType.trim()}")
+        appendLine("• الاسم / الجهة: ${senderName.trim()}")
+        appendLine("• رقم الهاتف: ${phone.trim()}")
+        appendLine("• المحافظة والمنطقة: ${governorate.trim()}")
+        appendLine("• التاريخ والوقت: ${eventDate.trim()}")
+        appendLine("• عنوان الفعالية: ${topic.trim()}")
+        if (details.isNotBlank()) {
+            appendLine("• ملاحظات إضافية: ${details.trim()}")
+        }
+    }.trim()
+    return "https://wa.me/$whatsAppDigits?text=${Uri.encode(body)}"
+}
+
+private fun launchWhatsAppWithUrl(
+    context: Context,
+    url: String,
+    onFailureMessage: (String) -> Unit,
+) {
+    runCatching {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+        context.startActivity(intent)
+    }.onFailure {
+        onFailureMessage("تعذر فتح تطبيق واتساب على هذا الجهاز، تأكد من تثبيت واتساب")
+    }
+}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -111,27 +154,56 @@ fun BookingCoverageScreen(
         unfocusedTextColor = PureWhite,
     )
 
-    fun submitNow() {
+    fun validateFields(): Boolean {
         if (senderName.trim().length < 2) {
             onShowMessage("يرجى كتابة الاسم أو اسم الجهة المنظمة")
-            return
+            return false
         }
         if (phone.trim().length < 5) {
             onShowMessage("يرجى كتابة رقم هاتف للتواصل")
-            return
+            return false
         }
         if (governorate.trim().length < 2) {
             onShowMessage("يرجى كتابة المحافظة والمنطقة")
-            return
+            return false
         }
         if (eventDate.trim().length < 2) {
             onShowMessage("يرجى تحديد تاريخ وموعد الفعالية")
-            return
+            return false
         }
         if (topic.trim().length < 2) {
             onShowMessage("يرجى كتابة عنوان الفعالية أو المجلس")
-            return
+            return false
         }
+        return true
+    }
+
+    fun openWhatsAppWithCurrentDetails() {
+        if (!validateFields()) return
+        val waUrl = buildBookingWhatsAppUrl(
+            serviceType = selectedServiceType,
+            senderName = senderName,
+            phone = phone,
+            governorate = governorate,
+            eventDate = eventDate,
+            topic = topic,
+            details = details,
+        )
+        launchWhatsAppWithUrl(context, waUrl, onShowMessage)
+    }
+
+    fun submitNow() {
+        if (!validateFields()) return
+
+        val waUrlSnapshot = buildBookingWhatsAppUrl(
+            serviceType = selectedServiceType,
+            senderName = senderName,
+            phone = phone,
+            governorate = governorate,
+            eventDate = eventDate,
+            topic = topic,
+            details = details,
+        )
 
         val doSend = {
             onSubmitBooking(
@@ -148,6 +220,7 @@ fun BookingCoverageScreen(
                 eventDate = ""
                 topic = ""
                 details = ""
+                launchWhatsAppWithUrl(context, waUrlSnapshot, onShowMessage)
             }
         }
 
@@ -158,7 +231,7 @@ fun BookingCoverageScreen(
                 scope = coroutineScope,
                 onAuthSuccess = { doSend() },
                 onAuthError = { msg -> onShowMessage(msg) },
-                onAuthCancelled = { onShowMessage("يتطلب إرسال الطلب تأكيد الهوية بحساب Google") },
+                onAuthCancelled = { onShowMessage("يتطلب توثيق الطلب تأكيد Google، أو يمكنك الإرسال لواتساب مباشرة") },
             )
         } else {
             doSend()
@@ -387,7 +460,34 @@ fun BookingCoverageScreen(
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (uiState.currentUser == null) "تأكيد بحساب Google وإرسال الطلب" else "إرسال طلب الحجز الآن",
+                            text = if (uiState.currentUser == null) {
+                                "حفظ الطلب والانتقال إلى واتساب"
+                            } else {
+                                "إرسال الحجز والانتقال إلى واتساب"
+                            },
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Button(
+                        onClick = { openWhatsAppWithCurrentDetails() },
+                        colors = ButtonDefaults.buttonColors(containerColor = EmeraldAccent, contentColor = PureWhite),
+                        shape = RoundedCornerShape(50),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .testTag("booking_whatsapp_button"),
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Chat,
+                            contentDescription = "واتساب الحجز",
+                            modifier = Modifier.size(19.dp),
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "إرسال المعلومات لواتساب مباشرة (+964 780 170 5580)",
                             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
                         )
                     }
@@ -403,7 +503,7 @@ fun BookingCoverageScreen(
                         shape = RoundedCornerShape(50),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("أو التنسيق الفوري عبر تيليجرام @SNG1080", color = GoldBright)
+                        Text("أو التنسيق عبر تيليجرام @SNG1080", color = GoldBright)
                     }
                 }
             }

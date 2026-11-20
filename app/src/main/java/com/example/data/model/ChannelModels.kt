@@ -215,3 +215,124 @@ data class CoverageRequestRecord(
     val createdAt: String,
 )
 
+@Keep
+@IgnoreExtraProperties
+data class CloudEventDoc(
+    @DocumentId val id: String = "",
+    val title: String = "",
+    val hijriDate: String = "",
+    val gregorianDate: String = "",
+    val timeLabel: String = "",
+    val location: String = "",
+    val status: String = "UPCOMING",
+    val description: String = "",
+    val createdByUid: String = "",
+    @ServerTimestamp val createdAt: Timestamp? = null,
+    @ServerTimestamp val updatedAt: Timestamp? = null,
+) {
+    fun toChannelEvent(): ChannelEvent = ChannelEvent(
+        id = id,
+        title = title,
+        hijriDate = hijriDate,
+        gregorianDate = gregorianDate,
+        timeLabel = timeLabel,
+        location = location,
+        status = enumValues<EventStatus>().firstOrNull { it.name == status } ?: EventStatus.UPCOMING,
+        description = description,
+        startTimeMillis = (createdAt?.toDate()?.time ?: System.currentTimeMillis()),
+    )
+}
+
+@Keep
+@IgnoreExtraProperties
+data class CloudNewsDoc(
+    @DocumentId val id: String = "",
+    val title: String = "",
+    val category: String = "أخبار القناة",
+    val summary: String = "",
+    val fullBody: String = "",
+    val publishedAt: String = "الآن",
+    val readingTime: String = "دقيقتان",
+    val author: String = "إدارة قناة الأنصاري",
+    val breaking: Boolean = false,
+    val createdByUid: String = "",
+    @ServerTimestamp val createdAt: Timestamp? = null,
+    @ServerTimestamp val updatedAt: Timestamp? = null,
+) {
+    fun toNewsReport(): NewsReport = NewsReport(
+        id = id,
+        title = title,
+        category = category,
+        summary = summary,
+        fullBody = fullBody,
+        publishedAt = publishedAt,
+        readingTime = readingTime,
+        author = author,
+        isBreaking = breaking,
+    )
+}
+
+@Keep
+@IgnoreExtraProperties
+data class CloudVideoDoc(
+    @DocumentId val id: String = "",
+    val title: String = "",
+    val category: String = "تغطيات خاصة",
+    val duration: String = "فيديو",
+    val publishedAt: String = "جديد",
+    val description: String = "",
+    val videoUrl: String = "",
+    val presenter: String = "قناة الأنصاري للإنتاج الفني",
+    val youtubeVideoId: String? = null,
+    val youtubeWatchUrl: String? = null,
+    val featured: Boolean = false,
+    val createdByUid: String = "",
+    @ServerTimestamp val createdAt: Timestamp? = null,
+    @ServerTimestamp val updatedAt: Timestamp? = null,
+) {
+    fun toVideoProgram(): VideoProgram = VideoProgram(
+        id = id,
+        title = title,
+        category = category,
+        duration = duration,
+        publishedAt = publishedAt,
+        description = description,
+        videoUrl = videoUrl,
+        presenter = presenter,
+        isFeatured = featured,
+        isPreviewStream = false,
+        youtubeVideoId = youtubeVideoId,
+        youtubeWatchUrl = youtubeWatchUrl,
+    )
+}
+
+@Keep
+@IgnoreExtraProperties
+data class CloudCoverageDoc(
+    @DocumentId val id: String = "",
+    val title: String = "",
+    val location: String = "",
+    val reporter: String = "وحدة البث الخارجي SNG1080",
+    val timestampLabel: String = "تغطية حديثة",
+    val statusLabel: String = "تغطية ميدانية",
+    val summary: String = "",
+    val videoUrl: String = "",
+    val youtubeUrl: String? = null,
+    val liveField: Boolean = false,
+    val createdByUid: String = "",
+    @ServerTimestamp val createdAt: Timestamp? = null,
+    @ServerTimestamp val updatedAt: Timestamp? = null,
+) {
+    fun toFieldCoverage(): FieldCoverage = FieldCoverage(
+        id = id,
+        title = title,
+        location = location,
+        reporter = reporter,
+        timestamp = timestampLabel,
+        statusLabel = statusLabel,
+        summary = summary,
+        videoUrl = videoUrl,
+        isLiveField = liveField,
+        youtubeUrl = youtubeUrl,
+    )
+}

@@ -1,6 +1,7 @@
 package com.example
 
 import android.content.Context
+import android.net.Uri
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -10,6 +11,11 @@ import androidx.test.core.app.ApplicationProvider
 import com.example.data.haqeebat.PrayerTimesCalculator
 import com.example.data.local.ChannelConfigStore
 import com.example.data.model.ChannelSettings
+import com.example.data.model.CloudCoverageDoc
+import com.example.data.model.CloudEventDoc
+import com.example.data.model.CloudNewsDoc
+import com.example.data.model.CloudVideoDoc
+import com.example.data.model.EventStatus
 import com.example.data.model.StreamProtocol
 import com.example.data.model.VideoProgram
 import com.example.data.model.detectStreamProtocol
@@ -17,12 +23,17 @@ import com.example.data.model.protocolBadgeLabel
 import com.example.data.repository.ChannelRepository
 import com.example.ui.components.AlAnsariBottomBar
 import com.example.ui.navigation.AlAnsariRoutes
+import com.example.ui.screens.ADMIN_DIRECT_LINK
+import com.example.ui.screens.AdminDirectLinkCard
+import com.example.ui.screens.BOOKING_WHATSAPP_NUMBER
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.VideoPlayerScreen
+import com.example.ui.screens.buildBookingWhatsAppUrl
 import com.example.ui.screens.extractYouTubeVideoId
 import com.example.ui.theme.AlAnsariTheme
 import com.example.ui.viewmodel.AlAnsariUiState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -238,5 +249,88 @@ class ExampleRobolectricTest {
         assertTrue(schedule.asrMinutes < schedule.sunsetMinutes)
         assertTrue(schedule.sunsetMinutes <= schedule.maghribMinutes)
         assertTrue(schedule.maghribMinutes < schedule.ishaMinutes)
+    }
+
+    @Test
+    fun `booking whatsapp link targets official iraqi number with all details`() {
+        val url = buildBookingWhatsAppUrl(
+            serviceType = "تغطية وبث مباشر",
+            senderName = "موكب أنصار الحسين",
+            phone = "07801234567",
+            governorate = "النجف الأشرف",
+            eventDate = "الجمعة 8 مساءً",
+            topic = "مجلس عزاء",
+            details = "بث عبر SNG",
+        )
+        assertTrue(url.startsWith("https://wa.me/$BOOKING_WHATSAPP_NUMBER?text="))
+        assertEquals("9647801705580", BOOKING_WHATSAPP_NUMBER)
+        val decoded = android.net.Uri.decode(url)
+        assertTrue(decoded.contains("موكب أنصار الحسين"))
+        assertTrue(decoded.contains("07801234567"))
+        assertTrue(decoded.contains("النجف الأشرف"))
+        assertTrue(decoded.contains("مجلس عزاء"))
+    }
+
+    @Test
+    fun `admin deep link detector matches custom scheme and intent extra`() {
+        assertTrue(isAdminPanelDeepLink(Uri.parse(ADMIN_DIRECT_LINK)))
+        assertFalse(isAdminPanelDeepLink(Uri.parse("https://alansari.tv/live")))
+        assertFalse(isAdminPanelDeepLink(Uri.parse("https://youtube.com/@alansarie1")))
+        assertFalse(isAdminPanelDeepLink(null))
+
+        val extraIntent = android.content.Intent().putExtra(EXTRA_OPEN_ADMIN_PANEL, true)
+        assertTrue(isAdminPanelIntent(extraIntent))
+        val uriIntent = android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(ADMIN_DIRECT_LINK))
+        assertTrue(isAdminPanelIntent(uriIntent))
+        assertFalse(isAdminPanelIntent(null))
+    }
+
+    @Test
+    fun `cloud section docs map cleanly to viewer domain models`() {
+        val ev = CloudEventDoc(
+            id = "ev1",
+            title = "مجلس عزاء مركزي",
+            location = "كربلاء المقدسة",
+            status = "ONGOING",
+        ).toChannelEvent()
+        assertEquals(EventStatus.ONGOING, ev.status)
+        assertEquals("كربلاء المقدسة", ev.location)
+
+        val news = CloudNewsDoc(
+            id = "n1",
+            title = "خبر عاجل",
+            summary = "ملخص الخبر",
+            breaking = true,
+        ).toNewsReport()
+        assertTrue(news.isBreaking)
+
+        val video = CloudVideoDoc(
+            id = "v1",
+            title = "بث مباشر خاص",
+            youtubeVideoId = "dQw4w9WgXcQ",
+        ).toVideoProgram()
+        assertEquals("dQw4w9WgXcQ", video.youtubeVideoId)
+
+        val cov = CloudCoverageDoc(
+            id = "c1",
+            title = "تغطية النجف",
+            location = "الصحن الحيدري",
+            liveField = true,
+        ).toFieldCoverage()
+        assertTrue(cov.isLiveField)
+    }
+
+    @Test
+    fun `admin direct link card renders url and copy or pin controls`() {
+        composeTestRule.setContent {
+            AlAnsariTheme {
+                AdminDirectLinkCard(onShowMessage = {})
+            }
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("admin_direct_link_text").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("admin_copy_link_button").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("admin_share_link_button").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("admin_pin_shortcut_button").assertIsDisplayed()
     }
 }

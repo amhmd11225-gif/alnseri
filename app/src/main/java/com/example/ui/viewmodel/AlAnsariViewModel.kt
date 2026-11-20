@@ -10,6 +10,10 @@ import com.example.data.model.ChannelEvent
 import com.example.data.model.ChannelServiceItem
 import com.example.data.model.ChannelSettings
 import com.example.data.model.CloudChannelConfig
+import com.example.data.model.CloudCoverageDoc
+import com.example.data.model.CloudEventDoc
+import com.example.data.model.CloudNewsDoc
+import com.example.data.model.CloudVideoDoc
 import com.example.data.model.CoverageBookingRequest
 import com.example.data.model.FieldCoverage
 import com.example.data.model.LiveChannelSource
@@ -20,6 +24,7 @@ import com.example.data.model.SocialPlatform
 import com.example.data.model.VideoProgram
 import com.example.data.remote.FirestoreChannelRepository
 import com.example.data.repository.ChannelRepository
+import com.example.ui.screens.extractYouTubeVideoId
 import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.auth
@@ -65,6 +70,10 @@ data class AlAnsariUiState(
     val isChannelOwner: Boolean = false,
     val myBookings: List<CoverageBookingRequest> = emptyList(),
     val adminBookings: List<CoverageBookingRequest> = emptyList(),
+    val cloudEvents: List<CloudEventDoc> = emptyList(),
+    val cloudNews: List<CloudNewsDoc> = emptyList(),
+    val cloudVideos: List<CloudVideoDoc> = emptyList(),
+    val cloudCoverages: List<CloudCoverageDoc> = emptyList(),
     val isSavingCloud: Boolean = false,
     val channelTitle: String = "قناة الأنصاري للإنتاج الفني",
     val channelLogoUrl: String? = null,
@@ -212,6 +221,38 @@ class AlAnsariViewModel(
         )
     }
 
+    private data class CloudSectionsState(
+        val events: List<CloudEventDoc> = emptyList(),
+        val news: List<CloudNewsDoc> = emptyList(),
+        val videos: List<CloudVideoDoc> = emptyList(),
+        val coverages: List<CloudCoverageDoc> = emptyList(),
+    )
+
+    private val cloudSectionsFlow = combine(
+        firestoreRepository.observeCloudEvents().catch { err ->
+            if (err is CancellationException) throw err
+            Log.w(TAG, "Error observing cloud events", err)
+            emit(emptyList())
+        },
+        firestoreRepository.observeCloudNews().catch { err ->
+            if (err is CancellationException) throw err
+            Log.w(TAG, "Error observing cloud news", err)
+            emit(emptyList())
+        },
+        firestoreRepository.observeCloudVideos().catch { err ->
+            if (err is CancellationException) throw err
+            Log.w(TAG, "Error observing cloud videos", err)
+            emit(emptyList())
+        },
+        firestoreRepository.observeCloudCoverages().catch { err ->
+            if (err is CancellationException) throw err
+            Log.w(TAG, "Error observing cloud coverages", err)
+            emit(emptyList())
+        },
+    ) { events, news, videos, coverages ->
+        CloudSectionsState(events = events, news = news, videos = videos, coverages = coverages)
+    }
+
     private val haqeebatPrefsFlow = combine(
         configStore.tasbeehTotalFlow,
         configStore.selectedCityIdFlow,
@@ -228,13 +269,20 @@ class AlAnsariViewModel(
         )
     }
 
+    private val haqeebatAndCloudFlow = combine(
+        haqeebatPrefsFlow,
+        cloudSectionsFlow,
+    ) { haqeebatState, cloudSections ->
+        haqeebatState to cloudSections
+    }
+
     val uiState: StateFlow<AlAnsariUiState> = combine(
         repository.settingsFlow,
         cloudConfigFlow,
         repository.savedRequestsFlow,
         auxiliaryFlow,
-        haqeebatPrefsFlow,
-    ) { localSettings, cloudConfig, savedRequests, aux, haqeebatState ->
+        haqeebatAndCloudFlow,
+    ) { localSettings, cloudConfig, savedRequests, aux, (haqeebatState, cloudSections) ->
         val effectiveSettings = if (cloudConfig != null) {
             localSettings.copy(
                 primaryLiveUrl = cloudConfig.primaryLiveUrl,
@@ -307,12 +355,21 @@ class AlAnsariViewModel(
             ?: aux.ytVideos?.takeIf { it.isNotEmpty() }
             ?: repository.defaultVideos
 
+        val mergedVideos = (cloudSections.videos.map { it.toVideoProgram() } + baseVideos).distinctBy { it.id }
+        val mergedEvents = (cloudSections.events.map { it.toChannelEvent() } + (remoteEventsOverride.value ?: repository.events)).distinctBy { it.id }
+        val mergedNews = (cloudSections.news.map { it.toNewsReport() } + (remoteNewsOverride.value ?: repository.newsReports)).distinctBy { it.id }
+        val mergedCoverages = (cloudSections.coverages.map { it.toFieldCoverage() } + (remoteCoveragesOverride.value ?: repository.fieldCoverages)).distinctBy { it.id }
+
         AlAnsariUiState(
             settings = effectiveSettings,
             currentUser = aux.currentUser,
             isChannelOwner = GoogleAuthHelper.isVerifiedChannelOwner(aux.currentUser),
             myBookings = aux.myBookings,
             adminBookings = aux.adminBookings,
+            cloudEvents = cloudSections.events,
+            cloudNews = cloudSections.news,
+            cloudVideos = cloudSections.videos,
+            cloudCoverages = cloudSections.coverages,
             isSavingCloud = aux.isSavingCloud,
             channelTitle = aux.channelTitle,
             channelLogoUrl = aux.logoUrl,
@@ -321,10 +378,10 @@ class AlAnsariViewModel(
             liveSources = liveSources,
             selectedLiveSourceId = resolvedSelectedId,
             scheduleItems = repository.scheduleItems,
-            videos = baseVideos,
-            fieldCoverages = remoteCoveragesOverride.value ?: repository.fieldCoverages,
-            events = remoteEventsOverride.value ?: repository.events,
-            newsReports = remoteNewsOverride.value ?: repository.newsReports,
+            videos = mergedVideos,
+            fieldCoverages = mergedCoverages,
+            events = mergedEvents,
+            newsReports = mergedNews,
             socialLinks = effectiveSocialLinks,
             services = repository.servicesList,
             bookmarkedVideoIds = aux.bookmarkedVideos,
@@ -487,6 +544,196 @@ class AlAnsariViewModel(
                 statusMessageFlow.value = "تم تحديث حالة طلب الحجز بنجاح"
             }.onFailure { err ->
                 statusMessageFlow.value = err.localizedMessage ?: "تعذر تحديث حالة الطلب"
+            }
+        }
+    }
+
+    fun publishChannelEvent(
+        title: String,
+        hijriDate: String,
+        gregorianDate: String,
+        timeLabel: String,
+        location: String,
+        status: String,
+        description: String,
+        onSuccess: () -> Unit = {},
+    ) {
+        viewModelScope.launch {
+            isSavingCloudFlow.value = true
+            val result = firestoreRepository.publishChannelEvent(
+                title = title,
+                hijriDate = hijriDate,
+                gregorianDate = gregorianDate,
+                timeLabel = timeLabel,
+                location = location,
+                status = status,
+                description = description,
+            )
+            isSavingCloudFlow.value = false
+            result.onSuccess {
+                statusMessageFlow.value = "تمت إضافة الفعالية ونشرها في التطبيق بنجاح"
+                onSuccess()
+            }.onFailure { err ->
+                statusMessageFlow.value = err.localizedMessage ?: "تعذر نشر الفعالية"
+            }
+        }
+    }
+
+    fun updateCloudEventStatus(eventId: String, newStatus: String) {
+        viewModelScope.launch {
+            isSavingCloudFlow.value = true
+            val result = firestoreRepository.updateCloudEventStatus(eventId, newStatus)
+            isSavingCloudFlow.value = false
+            result.onSuccess {
+                statusMessageFlow.value = "تم تحديث حالة الفعالية"
+            }.onFailure { err ->
+                statusMessageFlow.value = err.localizedMessage ?: "تعذر تحديث حالة الفعالية"
+            }
+        }
+    }
+
+    fun deleteCloudEvent(eventId: String) {
+        viewModelScope.launch {
+            isSavingCloudFlow.value = true
+            val result = firestoreRepository.deleteCloudEvent(eventId)
+            isSavingCloudFlow.value = false
+            result.onSuccess {
+                statusMessageFlow.value = "تم حذف الفعالية من التطبيق"
+            }.onFailure { err ->
+                statusMessageFlow.value = err.localizedMessage ?: "تعذر حذف الفعالية"
+            }
+        }
+    }
+
+    fun publishChannelNews(
+        title: String,
+        category: String,
+        summary: String,
+        fullBody: String,
+        author: String,
+        isBreaking: Boolean,
+        onSuccess: () -> Unit = {},
+    ) {
+        viewModelScope.launch {
+            isSavingCloudFlow.value = true
+            val result = firestoreRepository.publishChannelNews(
+                title = title,
+                category = category,
+                summary = summary,
+                fullBody = fullBody,
+                author = author,
+                isBreaking = isBreaking,
+            )
+            isSavingCloudFlow.value = false
+            result.onSuccess {
+                statusMessageFlow.value = "تم نشر الخبر في قسم الأخبار بنجاح"
+                onSuccess()
+            }.onFailure { err ->
+                statusMessageFlow.value = err.localizedMessage ?: "تعذر نشر الخبر"
+            }
+        }
+    }
+
+    fun deleteCloudNews(newsId: String) {
+        viewModelScope.launch {
+            isSavingCloudFlow.value = true
+            val result = firestoreRepository.deleteCloudNews(newsId)
+            isSavingCloudFlow.value = false
+            result.onSuccess {
+                statusMessageFlow.value = "تم حذف الخبر بنجاح"
+            }.onFailure { err ->
+                statusMessageFlow.value = err.localizedMessage ?: "تعذر حذف الخبر"
+            }
+        }
+    }
+
+    fun publishChannelVideo(
+        title: String,
+        category: String,
+        presenter: String,
+        duration: String,
+        description: String,
+        streamOrYoutubeUrl: String,
+        onSuccess: () -> Unit = {},
+    ) {
+        viewModelScope.launch {
+            isSavingCloudFlow.value = true
+            val ytId = extractYouTubeVideoId(streamOrYoutubeUrl)
+            val result = firestoreRepository.publishChannelVideo(
+                title = title,
+                category = category,
+                presenter = presenter,
+                duration = duration,
+                description = description,
+                streamOrYoutubeUrl = streamOrYoutubeUrl,
+                youtubeVideoId = ytId,
+            )
+            isSavingCloudFlow.value = false
+            result.onSuccess {
+                statusMessageFlow.value = "تمت إضافة الفيديو إلى مكتبة البرامج بنجاح"
+                onSuccess()
+            }.onFailure { err ->
+                statusMessageFlow.value = err.localizedMessage ?: "تعذر إضافة الفيديو"
+            }
+        }
+    }
+
+    fun deleteCloudVideo(videoId: String) {
+        viewModelScope.launch {
+            isSavingCloudFlow.value = true
+            val result = firestoreRepository.deleteCloudVideo(videoId)
+            isSavingCloudFlow.value = false
+            result.onSuccess {
+                statusMessageFlow.value = "تم حذف الفيديو بنجاح"
+            }.onFailure { err ->
+                statusMessageFlow.value = err.localizedMessage ?: "تعذر حذف الفيديو"
+            }
+        }
+    }
+
+    fun publishChannelCoverage(
+        title: String,
+        location: String,
+        reporter: String,
+        statusLabel: String,
+        summary: String,
+        videoUrl: String,
+        isLiveField: Boolean,
+        onSuccess: () -> Unit = {},
+    ) {
+        viewModelScope.launch {
+            isSavingCloudFlow.value = true
+            val trimmedUrl = videoUrl.trim()
+            val ytId = extractYouTubeVideoId(trimmedUrl)
+            val result = firestoreRepository.publishChannelCoverage(
+                title = title,
+                location = location,
+                reporter = reporter,
+                statusLabel = statusLabel,
+                summary = summary,
+                videoUrl = if (ytId != null) "" else trimmedUrl,
+                youtubeUrl = if (ytId != null) trimmedUrl else null,
+                isLiveField = isLiveField,
+            )
+            isSavingCloudFlow.value = false
+            result.onSuccess {
+                statusMessageFlow.value = "تم نشر التغطية الميدانية بنجاح"
+                onSuccess()
+            }.onFailure { err ->
+                statusMessageFlow.value = err.localizedMessage ?: "تعذر نشر التغطية"
+            }
+        }
+    }
+
+    fun deleteCloudCoverage(coverageId: String) {
+        viewModelScope.launch {
+            isSavingCloudFlow.value = true
+            val result = firestoreRepository.deleteCloudCoverage(coverageId)
+            isSavingCloudFlow.value = false
+            result.onSuccess {
+                statusMessageFlow.value = "تم حذف التغطية بنجاح"
+            }.onFailure { err ->
+                statusMessageFlow.value = err.localizedMessage ?: "تعذر حذف التغطية"
             }
         }
     }

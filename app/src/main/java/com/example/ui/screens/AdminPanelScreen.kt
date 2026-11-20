@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -74,6 +75,15 @@ import com.example.ui.theme.ObsidianBlack
 import com.example.ui.theme.PureWhite
 import com.example.ui.viewmodel.AlAnsariUiState
 
+enum class AdminSectionTab(val label: String) {
+    LIVE("البث والروابط"),
+    EVENTS("الفعاليات"),
+    NEWS("الأخبار"),
+    VIDEOS("الفيديوهات"),
+    COVERAGES("التغطيات"),
+    BOOKINGS("الحجوزات"),
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AdminPanelScreen(
@@ -91,6 +101,15 @@ fun AdminPanelScreen(
         satelliteFrequency: String,
     ) -> Unit,
     onUpdateBookingStatus: (requestId: String, newStatus: String, adminNote: String?) -> Unit,
+    onPublishEvent: (String, String, String, String, String, String, String, () -> Unit) -> Unit,
+    onUpdateEventStatus: (String, String) -> Unit,
+    onDeleteEvent: (String) -> Unit,
+    onPublishNews: (String, String, String, String, String, Boolean, () -> Unit) -> Unit,
+    onDeleteNews: (String) -> Unit,
+    onPublishVideo: (String, String, String, String, String, String, () -> Unit) -> Unit,
+    onDeleteVideo: (String) -> Unit,
+    onPublishCoverage: (String, String, String, String, String, String, Boolean, () -> Unit) -> Unit,
+    onDeleteCoverage: (String) -> Unit,
     onRefreshYouTube: () -> Unit,
     onSyncCms: (String) -> Unit,
     onShowMessage: (String) -> Unit,
@@ -109,7 +128,7 @@ fun AdminPanelScreen(
     ) {
         AlAnsariSubTopBar(
             title = "لوحة تحكم مالك القناة",
-            badgeText = "إدارة البث والطلبات",
+            badgeText = "إدارة شاملة للتطبيق",
             onBackClick = onBackClick,
             trailingAction = {
                 if (uiState.currentUser != null) {
@@ -151,12 +170,12 @@ fun AdminPanelScreen(
                                 modifier = Modifier.size(48.dp),
                             )
                             Text(
-                                text = "بوابة إدارة البث المباشر",
+                                text = "بوابة الإدارة الخاصة بقناة الأنصاري",
                                 style = MaterialTheme.typography.titleLarge.copy(color = GoldBright, fontWeight = FontWeight.Bold),
                                 textAlign = TextAlign.Center,
                             )
                             Text(
-                                text = "هذه اللوحة معزولة ومحمية لمالك قناة الأنصاري فقط. يرجى تسجيل الدخول بحساب Google المصرّح به للتحكم بروابط البث (HLS / RTMP / SRT) وإدارة طلبات الحجز.",
+                                text = "هذه اللوحة معزولة ومحمية لمالك قناة الأنصاري فقط. يرجى تسجيل الدخول بحساب Google المصرّح به للتحكم بالبث المباشر والفعاليات والأخبار والفيديوهات والتغطيات وطلبات الحجز.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 textAlign = TextAlign.Center,
                             )
@@ -212,7 +231,7 @@ fun AdminPanelScreen(
                                 textAlign = TextAlign.Center,
                             )
                             Text(
-                                text = "أنت مسجّل بالحساب:\n${uiState.currentUser.email.orEmpty()}\n\nالتحكم ببث القناة محصور حصرياً بحساب مالك القناة المعتمد (${GoogleAuthHelper.CHANNEL_OWNER_EMAIL}).",
+                                text = "أنت مسجّل بالحساب:\n${uiState.currentUser.email.orEmpty()}\n\nالتحكم ببث وأقسام القناة محصور حصرياً بحساب مالك القناة المعتمد (${GoogleAuthHelper.CHANNEL_OWNER_EMAIL}).",
                                 style = MaterialTheme.typography.bodyMedium,
                                 textAlign = TextAlign.Center,
                             )
@@ -237,8 +256,18 @@ fun AdminPanelScreen(
                     uiState = uiState,
                     onPublishCloudConfig = onPublishCloudConfig,
                     onUpdateBookingStatus = onUpdateBookingStatus,
+                    onPublishEvent = onPublishEvent,
+                    onUpdateEventStatus = onUpdateEventStatus,
+                    onDeleteEvent = onDeleteEvent,
+                    onPublishNews = onPublishNews,
+                    onDeleteNews = onDeleteNews,
+                    onPublishVideo = onPublishVideo,
+                    onDeleteVideo = onDeleteVideo,
+                    onPublishCoverage = onPublishCoverage,
+                    onDeleteCoverage = onDeleteCoverage,
                     onRefreshYouTube = onRefreshYouTube,
                     onSyncCms = onSyncCms,
+                    onShowMessage = onShowMessage,
                 )
             }
         }
@@ -251,9 +280,20 @@ private fun AdminOwnerDashboardContent(
     uiState: AlAnsariUiState,
     onPublishCloudConfig: (String, String, String, String, String, String, String, String, String, String) -> Unit,
     onUpdateBookingStatus: (String, String, String?) -> Unit,
+    onPublishEvent: (String, String, String, String, String, String, String, () -> Unit) -> Unit,
+    onUpdateEventStatus: (String, String) -> Unit,
+    onDeleteEvent: (String) -> Unit,
+    onPublishNews: (String, String, String, String, String, Boolean, () -> Unit) -> Unit,
+    onDeleteNews: (String) -> Unit,
+    onPublishVideo: (String, String, String, String, String, String, () -> Unit) -> Unit,
+    onDeleteVideo: (String) -> Unit,
+    onPublishCoverage: (String, String, String, String, String, String, Boolean, () -> Unit) -> Unit,
+    onDeleteCoverage: (String) -> Unit,
     onRefreshYouTube: () -> Unit,
     onSyncCms: (String) -> Unit,
+    onShowMessage: (String) -> Unit,
 ) {
+    var selectedTab by remember { mutableStateOf(AdminSectionTab.LIVE) }
     var primaryLive by remember(uiState.settings.primaryLiveUrl) { mutableStateOf(uiState.settings.primaryLiveUrl) }
     var backupLive by remember(uiState.settings.backupLiveUrl) { mutableStateOf(uiState.settings.backupLiveUrl) }
     var liveTitle by remember(uiState.settings.liveTitle) { mutableStateOf(uiState.settings.liveTitle) }
@@ -300,7 +340,6 @@ private fun AdminOwnerDashboardContent(
         contentPadding = PaddingValues(vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // Owner Verified Header
         item {
             AlAnsariGoldCard {
                 Row(
@@ -324,231 +363,296 @@ private fun AdminOwnerDashboardContent(
             }
         }
 
-        // 1. Live Broadcast Stream Control (HLS / RTMP / SRT)
         item {
-            AlAnsariGoldCard {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = "التحكم الفوري برابط البث المباشر",
-                        style = MaterialTheme.typography.titleMedium.copy(color = GoldBright),
-                    )
-                    if (primaryLive.isNotBlank()) {
-                        CrimsonPillBadge(text = detectedProtocolLabel, horizontalPadding = 10.dp)
-                    }
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "أي رابط تنشره هنا يظهر ويشغل البث مباشرة عند جميع المشاهدين. يدعم البروتوكولات: HLS (.m3u8) و RTMP (rtmp://) و SRT (srt://).",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    GoldOutlineChip(
-                        text = "HLS (.m3u8)",
-                        selected = primaryLive.contains(".m3u8", ignoreCase = true),
-                        onClick = {
-                            if (primaryLive.isBlank()) primaryLive = "https://"
-                        },
-                    )
-                    GoldOutlineChip(
-                        text = "RTMP (rtmp://)",
-                        selected = primaryLive.startsWith("rtmp", ignoreCase = true),
-                        onClick = {
-                            if (primaryLive.isBlank() || primaryLive.startsWith("http") || primaryLive.startsWith("srt")) {
-                                primaryLive = "rtmp://"
-                            }
-                        },
-                    )
-                    GoldOutlineChip(
-                        text = "SRT (srt://)",
-                        selected = primaryLive.startsWith("srt://", ignoreCase = true),
-                        onClick = {
-                            if (primaryLive.isBlank() || primaryLive.startsWith("http") || primaryLive.startsWith("rtmp")) {
-                                primaryLive = "srt://"
-                            }
-                        },
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                OutlinedTextField(
-                    value = liveTitle,
-                    onValueChange = { liveTitle = it },
-                    label = { Text("عنوان البث الظاهر للمشاهدين") },
-                    singleLine = true,
-                    colors = fieldColors,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = primaryLive,
-                    onValueChange = { primaryLive = it },
-                    label = { Text("رابط البث الرئيسي (m3u8 / rtmp:// / srt://)") },
-                    placeholder = { Text("srt://server:9000?streamid=... أو rtmp://... أو https://.../live.m3u8") },
-                    singleLine = true,
-                    colors = fieldColors,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("admin_primary_live_input"),
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = backupLive,
-                    onValueChange = { backupLive = it },
-                    label = { Text("رابط البث الاحتياطي") },
-                    singleLine = true,
-                    colors = fieldColors,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Button(
-                    onClick = { publishAll() },
-                    enabled = !uiState.isSavingCloud,
-                    colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed, contentColor = PureWhite),
-                    shape = RoundedCornerShape(50),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                        .testTag("admin_publish_live_button"),
-                ) {
-                    if (uiState.isSavingCloud) {
-                        CircularProgressIndicator(color = PureWhite, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(AdminSectionTab.entries) { tab ->
+                    val label = if (tab == AdminSectionTab.BOOKINGS && uiState.adminBookings.isNotEmpty()) {
+                        "${tab.label} (${uiState.adminBookings.size})"
                     } else {
-                        Icon(Icons.Filled.CloudDone, contentDescription = null, modifier = Modifier.size(18.dp))
+                        tab.label
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("حفظ ونشر البث لجميع المشاهدين", style = MaterialTheme.typography.labelLarge)
-                }
-
-                if (primaryLive.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedButton(
-                        onClick = {
-                            primaryLive = ""
-                            publishAll(overridePrimary = "")
-                        },
-                        enabled = !uiState.isSavingCloud,
-                        shape = RoundedCornerShape(50),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Icon(Icons.Filled.StopCircle, contentDescription = null, tint = GoldBright, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("مسح الرابط الرئيسي (تشغيل الاحتياطي)", color = GoldBright)
-                    }
-                }
-            }
-        }
-
-        // 2. Incoming Coverage Bookings Inbox
-        item {
-            Text(
-                text = "طلبات حجز التغطيات الواردة (${uiState.adminBookings.size})",
-                style = MaterialTheme.typography.titleMedium.copy(color = GoldBright),
-                modifier = Modifier.padding(top = 4.dp),
-            )
-        }
-
-        if (uiState.adminBookings.isEmpty()) {
-            item {
-                AlAnsariGoldCard {
-                    Text(
-                        text = "لا توجد طلبات حجز جديدة حالياً.",
-                        style = MaterialTheme.typography.bodyMedium,
+                    GoldOutlineChip(
+                        text = label,
+                        selected = selectedTab == tab,
+                        onClick = { selectedTab = tab },
+                        modifier = Modifier.testTag("admin_tab_${tab.name.lowercase()}"),
                     )
                 }
             }
-        } else {
-            items(uiState.adminBookings, key = { it.id }) { booking ->
-                AdminBookingItemCard(
-                    booking = booking,
-                    isSaving = uiState.isSavingCloud,
-                    onUpdateStatus = onUpdateBookingStatus,
-                )
-            }
         }
 
-        // 3. YouTube & Social Settings
-        item {
-            AlAnsariGoldCard {
-                Text(
-                    text = "إعدادات يوتيوب والروابط الرسمية والتردد",
-                    style = MaterialTheme.typography.titleMedium.copy(color = GoldBright),
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = ytHandle, onValueChange = { ytHandle = it }, label = { Text("معرّف يوتيوب (@alansarie1)") }, singleLine = true, colors = fieldColors, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = ytChannelId, onValueChange = { ytChannelId = it }, label = { Text("Channel ID") }, singleLine = true, colors = fieldColors, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = frequency, onValueChange = { frequency = it }, label = { Text("معلومات البث / التردد") }, singleLine = true, colors = fieldColors, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = telegramUrl, onValueChange = { telegramUrl = it }, label = { Text("رابط تيليجرام") }, singleLine = true, colors = fieldColors, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = facebookUrl, onValueChange = { facebookUrl = it }, label = { Text("رابط فيسبوك") }, singleLine = true, colors = fieldColors, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = tiktokUrl, onValueChange = { tiktokUrl = it }, label = { Text("رابط تيك توك") }, singleLine = true, colors = fieldColors, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = instagramUrl, onValueChange = { instagramUrl = it }, label = { Text("رابط إنستغرام") }, singleLine = true, colors = fieldColors, modifier = Modifier.fillMaxWidth())
+        when (selectedTab) {
+            AdminSectionTab.LIVE -> {
+                item {
+                    AdminDirectLinkCard(onShowMessage = onShowMessage)
                 }
-                Spacer(modifier = Modifier.height(10.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Button(
-                        onClick = { publishAll() },
-                        enabled = !uiState.isSavingCloud,
-                        colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed, contentColor = PureWhite),
-                        shape = RoundedCornerShape(50),
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text("نشر الروابط", style = MaterialTheme.typography.labelLarge)
+
+                item {
+                    AlAnsariGoldCard {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "التحكم الفوري برابط البث المباشر",
+                                style = MaterialTheme.typography.titleMedium.copy(color = GoldBright),
+                            )
+                            if (primaryLive.isNotBlank()) {
+                                CrimsonPillBadge(text = detectedProtocolLabel, horizontalPadding = 10.dp)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "أي رابط تنشره هنا يظهر ويشغل البث مباشرة عند جميع المشاهدين. يدعم: HLS (.m3u8) و RTMP (rtmp://) و SRT (srt://).",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            GoldOutlineChip(
+                                text = "HLS (.m3u8)",
+                                selected = primaryLive.contains(".m3u8", ignoreCase = true),
+                                onClick = { if (primaryLive.isBlank()) primaryLive = "https://" },
+                            )
+                            GoldOutlineChip(
+                                text = "RTMP (rtmp://)",
+                                selected = primaryLive.startsWith("rtmp", ignoreCase = true),
+                                onClick = {
+                                    if (primaryLive.isBlank() || primaryLive.startsWith("http") || primaryLive.startsWith("srt")) {
+                                        primaryLive = "rtmp://"
+                                    }
+                                },
+                            )
+                            GoldOutlineChip(
+                                text = "SRT (srt://)",
+                                selected = primaryLive.startsWith("srt://", ignoreCase = true),
+                                onClick = {
+                                    if (primaryLive.isBlank() || primaryLive.startsWith("http") || primaryLive.startsWith("rtmp")) {
+                                        primaryLive = "srt://"
+                                    }
+                                },
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = liveTitle,
+                            onValueChange = { liveTitle = it },
+                            label = { Text("عنوان البث الظاهر للمشاهدين") },
+                            singleLine = true,
+                            colors = fieldColors,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = primaryLive,
+                            onValueChange = { primaryLive = it },
+                            label = { Text("رابط البث الرئيسي (m3u8 / rtmp:// / srt://)") },
+                            placeholder = { Text("srt://server:9000?streamid=... أو rtmp://... أو https://.../live.m3u8") },
+                            singleLine = true,
+                            colors = fieldColors,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("admin_primary_live_input"),
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = backupLive,
+                            onValueChange = { backupLive = it },
+                            label = { Text("رابط البث الاحتياطي") },
+                            singleLine = true,
+                            colors = fieldColors,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = { publishAll() },
+                            enabled = !uiState.isSavingCloud,
+                            colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed, contentColor = PureWhite),
+                            shape = RoundedCornerShape(50),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp)
+                                .testTag("admin_publish_live_button"),
+                        ) {
+                            if (uiState.isSavingCloud) {
+                                CircularProgressIndicator(color = PureWhite, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Filled.CloudDone, contentDescription = null, modifier = Modifier.size(18.dp))
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("حفظ ونشر البث لجميع المشاهدين", style = MaterialTheme.typography.labelLarge)
+                        }
+                        if (primaryLive.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    primaryLive = ""
+                                    publishAll(overridePrimary = "")
+                                },
+                                enabled = !uiState.isSavingCloud,
+                                shape = RoundedCornerShape(50),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Icon(Icons.Filled.StopCircle, contentDescription = null, tint = GoldBright, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("مسح الرابط الرئيسي (تشغيل الاحتياطي)", color = GoldBright)
+                            }
+                        }
                     }
-                    OutlinedButton(
-                        onClick = onRefreshYouTube,
-                        enabled = !uiState.isRefreshingYouTube,
-                        shape = RoundedCornerShape(50),
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Icon(Icons.Filled.Refresh, contentDescription = null, tint = GoldBright, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("تحديث يوتيوب", color = GoldBright)
+                }
+
+                item {
+                    AlAnsariGoldCard {
+                        Text(
+                            text = "إعدادات يوتيوب والروابط الرسمية والتردد",
+                            style = MaterialTheme.typography.titleMedium.copy(color = GoldBright),
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(value = ytHandle, onValueChange = { ytHandle = it }, label = { Text("معرّف يوتيوب (@alansarie1)") }, singleLine = true, colors = fieldColors, modifier = Modifier.fillMaxWidth())
+                            OutlinedTextField(value = ytChannelId, onValueChange = { ytChannelId = it }, label = { Text("Channel ID") }, singleLine = true, colors = fieldColors, modifier = Modifier.fillMaxWidth())
+                            OutlinedTextField(value = frequency, onValueChange = { frequency = it }, label = { Text("معلومات البث / التردد") }, singleLine = true, colors = fieldColors, modifier = Modifier.fillMaxWidth())
+                            OutlinedTextField(value = telegramUrl, onValueChange = { telegramUrl = it }, label = { Text("رابط تيليجرام") }, singleLine = true, colors = fieldColors, modifier = Modifier.fillMaxWidth())
+                            OutlinedTextField(value = facebookUrl, onValueChange = { facebookUrl = it }, label = { Text("رابط فيسبوك") }, singleLine = true, colors = fieldColors, modifier = Modifier.fillMaxWidth())
+                            OutlinedTextField(value = tiktokUrl, onValueChange = { tiktokUrl = it }, label = { Text("رابط تيك توك") }, singleLine = true, colors = fieldColors, modifier = Modifier.fillMaxWidth())
+                            OutlinedTextField(value = instagramUrl, onValueChange = { instagramUrl = it }, label = { Text("رابط إنستغرام") }, singleLine = true, colors = fieldColors, modifier = Modifier.fillMaxWidth())
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Button(
+                                onClick = { publishAll() },
+                                enabled = !uiState.isSavingCloud,
+                                colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed, contentColor = PureWhite),
+                                shape = RoundedCornerShape(50),
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text("نشر الروابط", style = MaterialTheme.typography.labelLarge)
+                            }
+                            OutlinedButton(
+                                onClick = onRefreshYouTube,
+                                enabled = !uiState.isRefreshingYouTube,
+                                shape = RoundedCornerShape(50),
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Icon(Icons.Filled.Refresh, contentDescription = null, tint = GoldBright, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("تحديث يوتيوب", color = GoldBright)
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    AlAnsariGoldCard {
+                        Text(
+                            text = "مزامنة أرشيف إضافي (CMS JSON)",
+                            style = MaterialTheme.typography.titleMedium.copy(color = GoldBright),
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        OutlinedTextField(
+                            value = cmsApiUrl,
+                            onValueChange = { cmsApiUrl = it },
+                            label = { Text("رابط خادم CMS (اختياري)") },
+                            singleLine = true,
+                            colors = fieldColors,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = { onSyncCms(cmsApiUrl) },
+                            enabled = !uiState.isSyncingCms,
+                            shape = RoundedCornerShape(50),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(Icons.Filled.CloudSync, contentDescription = null, tint = GoldBright, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("مزامنة من CMS الآن", color = GoldBright)
+                        }
                     }
                 }
             }
-        }
 
-        // 4. Optional CMS JSON Sync
-        item {
-            AlAnsariGoldCard {
-                Text(
-                    text = "مزامنة أرشيف إضافي (CMS JSON)",
-                    style = MaterialTheme.typography.titleMedium.copy(color = GoldBright),
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                OutlinedTextField(
-                    value = cmsApiUrl,
-                    onValueChange = { cmsApiUrl = it },
-                    label = { Text("رابط خادم CMS (اختياري)") },
-                    singleLine = true,
-                    colors = fieldColors,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = { onSyncCms(cmsApiUrl) },
-                    enabled = !uiState.isSyncingCms,
-                    shape = RoundedCornerShape(50),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(Icons.Filled.CloudSync, contentDescription = null, tint = GoldBright, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("مزامنة من CMS الآن", color = GoldBright)
+            AdminSectionTab.EVENTS -> {
+                item {
+                    AdminEventsManager(
+                        events = uiState.cloudEvents,
+                        isSaving = uiState.isSavingCloud,
+                        onPublishEvent = onPublishEvent,
+                        onUpdateEventStatus = onUpdateEventStatus,
+                        onDeleteEvent = onDeleteEvent,
+                    )
+                }
+            }
+
+            AdminSectionTab.NEWS -> {
+                item {
+                    AdminNewsSection(
+                        newsList = uiState.cloudNews,
+                        isSaving = uiState.isSavingCloud,
+                        onPublishNews = onPublishNews,
+                        onDeleteNews = onDeleteNews,
+                    )
+                }
+            }
+
+            AdminSectionTab.VIDEOS -> {
+                item {
+                    AdminVideosSection(
+                        videos = uiState.cloudVideos,
+                        isSaving = uiState.isSavingCloud,
+                        onPublishVideo = onPublishVideo,
+                        onDeleteVideo = onDeleteVideo,
+                    )
+                }
+            }
+
+            AdminSectionTab.COVERAGES -> {
+                item {
+                    AdminCoveragesSection(
+                        coverages = uiState.cloudCoverages,
+                        isSaving = uiState.isSavingCloud,
+                        onPublishCoverage = onPublishCoverage,
+                        onDeleteCoverage = onDeleteCoverage,
+                    )
+                }
+            }
+
+            AdminSectionTab.BOOKINGS -> {
+                item {
+                    Text(
+                        text = "طلبات حجز التغطيات الواردة (${uiState.adminBookings.size})",
+                        style = MaterialTheme.typography.titleMedium.copy(color = GoldBright),
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+                if (uiState.adminBookings.isEmpty()) {
+                    item {
+                        AlAnsariGoldCard {
+                            Text(
+                                text = "لا توجد طلبات حجز جديدة حالياً.",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    }
+                } else {
+                    items(uiState.adminBookings, key = { it.id }) { booking ->
+                        AdminBookingItemCard(
+                            booking = booking,
+                            isSaving = uiState.isSavingCloud,
+                            onUpdateStatus = onUpdateBookingStatus,
+                        )
+                    }
                 }
             }
         }

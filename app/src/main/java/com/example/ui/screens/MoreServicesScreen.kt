@@ -90,6 +90,45 @@ fun MoreServicesScreen(
             contentPadding = PaddingValues(14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (uiState.isChannelOwner) {
+                item {
+                    AlAnsariGoldCard(
+                        onClick = { onNavigate(AlAnsariRoutes.ADMIN_PANEL) },
+                        testTag = "owner_quick_admin_card",
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.AdminPanelSettings,
+                                    contentDescription = "لوحة تحكم المالك",
+                                    tint = GoldBright,
+                                    modifier = Modifier.size(30.dp),
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = "لوحة تحكم مالك القناة",
+                                        style = MaterialTheme.typography.titleMedium.copy(color = GoldBright),
+                                    )
+                                    Text(
+                                        text = "إدارة البث، الفعاليات، الأخبار، الفيديوهات والحجوزات",
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp),
+                                    )
+                                }
+                            }
+                            CrimsonPillBadge(text = "فتح مباشر", horizontalPadding = 12.dp)
+                        }
+                    }
+                }
+            }
+
             // Satellite Frequency Card
             item {
                 AlAnsariGoldCard {

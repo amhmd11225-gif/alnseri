@@ -62,9 +62,67 @@ service cloud.firestore {
              data.updatedAt is timestamp && data.updatedAt <= request.time;
     }
 
+    function isValidChannelEvent(data) {
+      return data.title is string && data.title.size() >= 2 && data.title.size() <= 180 &&
+             data.hijriDate is string && data.hijriDate.size() >= 1 && data.hijriDate.size() <= 80 &&
+             data.gregorianDate is string && data.gregorianDate.size() >= 1 && data.gregorianDate.size() <= 80 &&
+             data.timeLabel is string && data.timeLabel.size() >= 1 && data.timeLabel.size() <= 80 &&
+             data.location is string && data.location.size() >= 2 && data.location.size() <= 140 &&
+             data.status in ['ONGOING', 'UPCOMING', 'ARCHIVED'] &&
+             data.description is string && data.description.size() <= 1500 &&
+             data.createdByUid is string && data.createdByUid.size() >= 1 && data.createdByUid.size() <= 128 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidChannelNews(data) {
+      return data.title is string && data.title.size() >= 2 && data.title.size() <= 200 &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 80 &&
+             data.summary is string && data.summary.size() >= 2 && data.summary.size() <= 500 &&
+             data.fullBody is string && data.fullBody.size() >= 2 && data.fullBody.size() <= 4000 &&
+             data.publishedAt is string && data.publishedAt.size() >= 1 && data.publishedAt.size() <= 60 &&
+             data.readingTime is string && data.readingTime.size() >= 1 && data.readingTime.size() <= 40 &&
+             data.author is string && data.author.size() >= 1 && data.author.size() <= 100 &&
+             data.breaking is bool &&
+             data.createdByUid is string && data.createdByUid.size() >= 1 && data.createdByUid.size() <= 128 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidChannelVideo(data) {
+      return data.title is string && data.title.size() >= 2 && data.title.size() <= 200 &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 80 &&
+             data.duration is string && data.duration.size() >= 1 && data.duration.size() <= 40 &&
+             data.publishedAt is string && data.publishedAt.size() >= 1 && data.publishedAt.size() <= 60 &&
+             data.description is string && data.description.size() <= 1500 &&
+             data.videoUrl is string && data.videoUrl.size() <= 1000 &&
+             data.presenter is string && data.presenter.size() >= 1 && data.presenter.size() <= 120 &&
+             (!('youtubeVideoId' in data) || (data.youtubeVideoId is string && data.youtubeVideoId.size() <= 64)) &&
+             (!('youtubeWatchUrl' in data) || (data.youtubeWatchUrl is string && data.youtubeWatchUrl.size() <= 1000)) &&
+             data.featured is bool &&
+             data.createdByUid is string && data.createdByUid.size() >= 1 && data.createdByUid.size() <= 128 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidChannelCoverage(data) {
+      return data.title is string && data.title.size() >= 2 && data.title.size() <= 200 &&
+             data.location is string && data.location.size() >= 2 && data.location.size() <= 120 &&
+             data.reporter is string && data.reporter.size() >= 1 && data.reporter.size() <= 120 &&
+             data.timestampLabel is string && data.timestampLabel.size() >= 1 && data.timestampLabel.size() <= 60 &&
+             data.statusLabel is string && data.statusLabel.size() >= 1 && data.statusLabel.size() <= 60 &&
+             data.summary is string && data.summary.size() <= 1500 &&
+             data.videoUrl is string && data.videoUrl.size() <= 1000 &&
+             (!('youtubeUrl' in data) || (data.youtubeUrl is string && data.youtubeUrl.size() <= 1000)) &&
+             data.liveField is bool &&
+             data.createdByUid is string && data.createdByUid.size() >= 1 && data.createdByUid.size() <= 128 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
     // --- COLLECTION RULES ---
 
-    // 1. Live Broadcast & Channel Config (single document 'live' readable by viewers, writable ONLY by verified owner)
+    // 1. Live Broadcast & Channel Config
     match /channel_config/{configId} {
       allow get: if isValidId(configId);
       allow list: if isChannelOwner();
@@ -100,7 +158,7 @@ service cloud.firestore {
       allow delete: if isChannelOwner() && isValidId(configId);
     }
 
-    // 2. Coverage & Live Broadcast Bookings (PII isolated per requester and verified channel owner)
+    // 2. Coverage & Live Broadcast Bookings
     match /coverage_requests/{requestId} {
       allow get: if isValidId(requestId) &&
                     isSignedIn() &&
@@ -138,6 +196,137 @@ service cloud.firestore {
       allow delete: if isValidId(requestId) &&
                        isSignedIn() &&
                        (isChannelOwner() || existing().userId == request.auth.uid);
+    }
+
+    // 3. Channel Events (Public Read, Owner Write)
+    match /channel_events/{eventId} {
+      allow get, list: if true;
+
+      allow create: if isChannelOwner() &&
+                       isValidId(eventId) &&
+                       incoming().createdByUid == request.auth.uid &&
+                       incoming().keys().hasAll([
+                         'title', 'hijriDate', 'gregorianDate', 'timeLabel',
+                         'location', 'status', 'description',
+                         'createdByUid', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'title', 'hijriDate', 'gregorianDate', 'timeLabel',
+                         'location', 'status', 'description',
+                         'createdByUid', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidChannelEvent(incoming());
+
+      allow update: if isChannelOwner() &&
+                       isValidId(eventId) &&
+                       isValidChannelEvent(incoming()) &&
+                       incoming().createdByUid == existing().createdByUid &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'title', 'hijriDate', 'gregorianDate', 'timeLabel',
+                         'location', 'status', 'description', 'updatedAt'
+                       ]);
+
+      allow delete: if isChannelOwner() && isValidId(eventId);
+    }
+
+    // 4. Channel News (Public Read, Owner Write)
+    match /channel_news/{newsId} {
+      allow get, list: if true;
+
+      allow create: if isChannelOwner() &&
+                       isValidId(newsId) &&
+                       incoming().createdByUid == request.auth.uid &&
+                       incoming().keys().hasAll([
+                         'title', 'category', 'summary', 'fullBody',
+                         'publishedAt', 'readingTime', 'author', 'breaking',
+                         'createdByUid', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'title', 'category', 'summary', 'fullBody',
+                         'publishedAt', 'readingTime', 'author', 'breaking',
+                         'createdByUid', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidChannelNews(incoming());
+
+      allow update: if isChannelOwner() &&
+                       isValidId(newsId) &&
+                       isValidChannelNews(incoming()) &&
+                       incoming().createdByUid == existing().createdByUid &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'title', 'category', 'summary', 'fullBody',
+                         'publishedAt', 'readingTime', 'author', 'breaking', 'updatedAt'
+                       ]);
+
+      allow delete: if isChannelOwner() && isValidId(newsId);
+    }
+
+    // 5. Channel Videos (Public Read, Owner Write)
+    match /channel_videos/{videoId} {
+      allow get, list: if true;
+
+      allow create: if isChannelOwner() &&
+                       isValidId(videoId) &&
+                       incoming().createdByUid == request.auth.uid &&
+                       incoming().keys().hasAll([
+                         'title', 'category', 'duration', 'publishedAt',
+                         'description', 'videoUrl', 'presenter', 'featured',
+                         'createdByUid', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'title', 'category', 'duration', 'publishedAt',
+                         'description', 'videoUrl', 'presenter', 'featured',
+                         'youtubeVideoId', 'youtubeWatchUrl',
+                         'createdByUid', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidChannelVideo(incoming());
+
+      allow update: if isChannelOwner() &&
+                       isValidId(videoId) &&
+                       isValidChannelVideo(incoming()) &&
+                       incoming().createdByUid == existing().createdByUid &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'title', 'category', 'duration', 'publishedAt',
+                         'description', 'videoUrl', 'presenter', 'featured',
+                         'youtubeVideoId', 'youtubeWatchUrl', 'updatedAt'
+                       ]);
+
+      allow delete: if isChannelOwner() && isValidId(videoId);
+    }
+
+    // 6. Channel Field Coverages (Public Read, Owner Write)
+    match /channel_coverages/{coverageId} {
+      allow get, list: if true;
+
+      allow create: if isChannelOwner() &&
+                       isValidId(coverageId) &&
+                       incoming().createdByUid == request.auth.uid &&
+                       incoming().keys().hasAll([
+                         'title', 'location', 'reporter', 'timestampLabel',
+                         'statusLabel', 'summary', 'videoUrl', 'liveField',
+                         'createdByUid', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'title', 'location', 'reporter', 'timestampLabel',
+                         'statusLabel', 'summary', 'videoUrl', 'youtubeUrl',
+                         'liveField', 'createdByUid', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidChannelCoverage(incoming());
+
+      allow update: if isChannelOwner() &&
+                       isValidId(coverageId) &&
+                       isValidChannelCoverage(incoming()) &&
+                       incoming().createdByUid == existing().createdByUid &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'title', 'location', 'reporter', 'timestampLabel',
+                         'statusLabel', 'summary', 'videoUrl', 'youtubeUrl',
+                         'liveField', 'updatedAt'
+                       ]);
+
+      allow delete: if isChannelOwner() && isValidId(coverageId);
     }
   }
 }

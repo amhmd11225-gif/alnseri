@@ -39,4 +39,6 @@
     <string name="hijri_subtitle">ومناسبات أهل البيت</string>
     <string name="istikhara_title">الاستخارة</string>
     <string name="istikhara_subtitle">والمسائل الشرعية</string>
+    <string name="shortcut_admin_short">لوحة التحكم</string>
+    <string name="shortcut_admin_long">لوحة تحكم مالك قناة الأنصاري</string>
 </resources>

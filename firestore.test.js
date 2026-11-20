@@ -245,3 +245,105 @@ test("Coverage requests: PII isolation, user-scoped query, and owner-only status
     })
   );
 });
+
+test("Channel sections (events, news, videos, coverages): public read, owner-only write & delete", async () => {
+  const unauthDb = testEnv.unauthenticatedContext().firestore();
+  const userDb = testEnv
+    .authenticatedContext(USER_A_UID, { email: "viewer@gmail.com", email_verified: true })
+    .firestore();
+  const ownerDb = testEnv
+    .authenticatedContext(OWNER_UID, { email: OWNER_EMAIL, email_verified: true })
+    .firestore();
+
+  const past = new Date(Date.now() - 2000);
+
+  const eventPayload = {
+    title: "مجلس عزاء مركزي",
+    hijriDate: "10 جمادى الآخرة 1448",
+    gregorianDate: "2026-11-20",
+    timeLabel: "08:00 مساءً",
+    location: "ذي قار - سوق الشيوخ",
+    status: "UPCOMING",
+    description: "تغطية مباشرة عبر قناة الأنصاري",
+    createdByUid: OWNER_UID,
+    createdAt: past,
+    updatedAt: past,
+  };
+
+  const newsPayload = {
+    title: "خبر عاجل من وحدة البث",
+    category: "أخبار القناة",
+    summary: "انطلاق تغطية ميدانية جديدة",
+    fullBody: "تفاصيل الخبر الكاملة من وحدة SNG1080",
+    publishedAt: "الآن",
+    readingTime: "دقيقة",
+    author: "إدارة القناة",
+    breaking: true,
+    createdByUid: OWNER_UID,
+    createdAt: past,
+    updatedAt: past,
+  };
+
+  const videoPayload = {
+    title: "محاضرة دينية خاصة",
+    category: "مجالس ومحاضرات",
+    duration: "يوتيوب",
+    publishedAt: "اليوم",
+    description: "بث مسجل عالي الدقة",
+    videoUrl: "",
+    presenter: "الشيخ حازم الباوي",
+    youtubeVideoId: "dQw4w9WgXcQ",
+    youtubeWatchUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    featured: true,
+    createdByUid: OWNER_UID,
+    createdAt: past,
+    updatedAt: past,
+  };
+
+  const coveragePayload = {
+    title: "تغطية موكب شهيد الجمعة",
+    location: "سوق الشيوخ",
+    reporter: "وحدة SNG1080",
+    timestampLabel: "مباشر الآن",
+    statusLabel: "بث ميداني",
+    summary: "نقل حي ومباشر للمواكب",
+    videoUrl: "https://example.com/live.m3u8",
+    liveField: true,
+    createdByUid: OWNER_UID,
+    createdAt: past,
+    updatedAt: past,
+  };
+
+  // Non-owner and unauthenticated users cannot create
+  await assertFails(unauthDb.collection("channel_events").doc("ev_1").set(eventPayload));
+  await assertFails(userDb.collection("channel_events").doc("ev_1").set({ ...eventPayload, createdByUid: USER_A_UID }));
+  await assertFails(userDb.collection("channel_news").doc("nw_1").set({ ...newsPayload, createdByUid: USER_A_UID }));
+  await assertFails(userDb.collection("channel_videos").doc("vd_1").set({ ...videoPayload, createdByUid: USER_A_UID }));
+  await assertFails(userDb.collection("channel_coverages").doc("cv_1").set({ ...coveragePayload, createdByUid: USER_A_UID }));
+
+  // Verified owner can create across all 4 collections
+  await assertSucceeds(ownerDb.collection("channel_events").doc("ev_1").set(eventPayload));
+  await assertSucceeds(ownerDb.collection("channel_news").doc("nw_1").set(newsPayload));
+  await assertSucceeds(ownerDb.collection("channel_videos").doc("vd_1").set(videoPayload));
+  await assertSucceeds(ownerDb.collection("channel_coverages").doc("cv_1").set(coveragePayload));
+
+  // Unauthenticated viewers can read all 4 collections
+  await assertSucceeds(unauthDb.collection("channel_events").get());
+  await assertSucceeds(unauthDb.collection("channel_news").get());
+  await assertSucceeds(unauthDb.collection("channel_videos").get());
+  await assertSucceeds(unauthDb.collection("channel_coverages").get());
+
+  // Non-owner cannot delete
+  await assertFails(userDb.collection("channel_events").doc("ev_1").delete());
+
+  // Owner can update event status & delete items
+  await assertSucceeds(
+    ownerDb.collection("channel_events").doc("ev_1").update({
+      status: "ONGOING",
+      updatedAt: new Date(Date.now() - 500),
+    })
+  );
+  await assertSucceeds(ownerDb.collection("channel_events").doc("ev_1").delete());
+  await assertSucceeds(ownerDb.collection("channel_news").doc("nw_1").delete());
+});
+

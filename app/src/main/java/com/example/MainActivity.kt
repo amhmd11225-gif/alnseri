@@ -1,5 +1,7 @@
 package com.example
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -15,14 +17,18 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.core.util.Consumer
 import androidx.credentials.CredentialManager
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -109,6 +115,31 @@ fun AlAnsariApp() {
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val credentialManager = remember(context) { CredentialManager.create(context) }
+    val activity = context as? ComponentActivity
+    var pendingAdminDeepLink by remember {
+        mutableStateOf(isAdminPanelIntent(activity?.intent))
+    }
+
+    DisposableEffect(activity) {
+        val listener = Consumer<Intent> { newIntent ->
+            if (isAdminPanelIntent(newIntent)) {
+                pendingAdminDeepLink = true
+            }
+        }
+        activity?.addOnNewIntentListener(listener)
+        onDispose {
+            activity?.removeOnNewIntentListener(listener)
+        }
+    }
+
+    LaunchedEffect(pendingAdminDeepLink) {
+        if (pendingAdminDeepLink) {
+            navController.navigate(AlAnsariRoutes.ADMIN_PANEL) {
+                launchSingleTop = true
+            }
+            pendingAdminDeepLink = false
+        }
+    }
 
     LaunchedEffect(Unit) {
         GoogleAuthHelper.attemptAutoSignIn(
@@ -306,6 +337,15 @@ fun AlAnsariApp() {
                         uiState = uiState,
                         onPublishCloudConfig = viewModel::publishCloudChannelConfig,
                         onUpdateBookingStatus = viewModel::updateBookingStatus,
+                        onPublishEvent = viewModel::publishChannelEvent,
+                        onUpdateEventStatus = viewModel::updateCloudEventStatus,
+                        onDeleteEvent = viewModel::deleteCloudEvent,
+                        onPublishNews = viewModel::publishChannelNews,
+                        onDeleteNews = viewModel::deleteCloudNews,
+                        onPublishVideo = viewModel::publishChannelVideo,
+                        onDeleteVideo = viewModel::deleteCloudVideo,
+                        onPublishCoverage = viewModel::publishChannelCoverage,
+                        onDeleteCoverage = viewModel::deleteCloudCoverage,
                         onRefreshYouTube = { viewModel.refreshFromYouTube(showToast = true) },
                         onSyncCms = viewModel::syncFromCmsDashboard,
                         onShowMessage = viewModel::showStatusMessage,
@@ -384,4 +424,19 @@ fun AlAnsariApp() {
             }
         }
     }
+}
+
+const val EXTRA_OPEN_ADMIN_PANEL = "open_admin_panel"
+
+fun isAdminPanelIntent(intent: Intent?): Boolean {
+    if (intent == null) return false
+    if (intent.getBooleanExtra(EXTRA_OPEN_ADMIN_PANEL, false)) return true
+    return isAdminPanelDeepLink(intent.data)
+}
+
+fun isAdminPanelDeepLink(uri: Uri?): Boolean {
+    if (uri == null) return false
+    val scheme = uri.scheme?.lowercase().orEmpty()
+    val host = uri.host?.lowercase().orEmpty()
+    return scheme == "alansari" && host == "admin"
 }
